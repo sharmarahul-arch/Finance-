@@ -1,0 +1,224 @@
+"""Streamlit dashboard for stock technical + fundamental analysis (Indian markets).
+
+Run with:  streamlit run app.py
+"""
+
+from __future__ import annotations
+
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from plotly.subplots import make_subplots
+
+from stock_analyzer import data as data_mod
+from stock_analyzer.config import HORIZONS
+from stock_analyzer.data import DataError
+from stock_analyzer.engine import analyze_stock
+
+st.set_page_config(page_title="Stock Analyzer — India", page_icon="📈", layout="wide")
+
+
+# --------------------------------------------------------------------------- #
+# Cached data wrappers (Streamlit-side caching; the library itself stays clean)
+# --------------------------------------------------------------------------- #
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_analyze(symbol: str, exchange: str, horizon: str):
+    return analyze_stock(symbol, exchange=exchange, horizon=horizon)
+
+
+def _fmt_money(value, currency="INR"):
+    if value is None:
+        return "—"
+    symbol = "₹" if currency == "INR" else ""
+    try:
+        return f"{symbol}{value:,.2f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _fmt_metric(name, value):
+    if value is None:
+        return "N/A"
+    if name in {"ROE", "Net margin", "Revenue growth", "Earnings growth", "Dividend yield"}:
+        return f"{value * 100:.1f}%"
+    if name == "Market cap":
+        return f"₹{value/1e7:,.0f} Cr"  # 1 crore = 1e7
+    return f"{value:,.2f}"
+
+
+# --------------------------------------------------------------------------- #
+# Charts
+# --------------------------------------------------------------------------- #
+def price_chart(df: pd.DataFrame, name: str):
+    """Candlestick + moving averages, with RSI and MACD sub-panels."""
+    fig = make_subplots(
+        rows=3, cols=1, shared_xaxes=True,
+        row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.03,
+        subplot_titles=(f"{name} — Price & Moving Averages", "RSI", "MACD"),
+    )
+
+    fig.add_trace(
+        go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"],
+            low=df["Low"], close=df["Close"], name="Price",
+        ),
+        row=1, col=1,
+    )
+    for col, color in [("SMA20", "#1f77b4"), ("SMA50", "#ff7f0e"), ("SMA200", "#9467bd")]:
+        if col in df and df[col].notna().any():
+            fig.add_trace(
+                go.Scatter(x=df.index, y=df[col], name=col, line=dict(width=1, color=color)),
+                row=1, col=1,
+            )
+
+    if "RSI" in df:
+        fig.add_trace(go.Scatter(x=df.index, y=df["RSI"], name="RSI", line=dict(color="#2ca02c")),
+                      row=2, col=1)
+        fig.add_hline(y=70, line=dict(color="red", dash="dot"), row=2, col=1)
+        fig.add_hline(y=30, line=dict(color="green", dash="dot"), row=2, col=1)
+
+    if "MACD" in df:
+        fig.add_trace(go.Scatter(x=df.index, y=df["MACD"], name="MACD", line=dict(color="#1f77b4")),
+                      row=3, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["MACD_SIGNAL"], name="Signal",
+                                 line=dict(color="#ff7f0e")), row=3, col=1)
+        fig.add_trace(go.Bar(x=df.index, y=df["MACD_HIST"], name="Histogram",
+                             marker_color="#888"), row=3, col=1)
+
+    fig.update_layout(
+        height=720, xaxis_rangeslider_visible=False,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=10, r=10, t=40, b=10),
+    )
+    return fig
+
+
+def gauge(score: float, color: str):
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=score,
+        number={"suffix": " / 100"},
+        gauge={
+            "axis": {"range": [0, 100]},
+            "bar": {"color": color},
+            "steps": [
+                {"range": [0, 25], "color": "#fadbd8"},
+                {"range": [25, 40], "color": "#fdebd0"},
+                {"range": [40, 60], "color": "#fcf3cf"},
+                {"range": [60, 75], "color": "#d5f5e3"},
+                {"range": [75, 100], "color": "#abebc6"},
+            ],
+        },
+    ))
+    fig.update_layout(height=240, margin=dict(l=20, r=20, t=20, b=10))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# Sidebar — inputs
+# --------------------------------------------------------------------------- #
+st.sidebar.title("📈 Stock Analyzer")
+st.sidebar.caption("Technical + fundamental analysis for Indian stocks")
+
+symbol = st.sidebar.text_input("Ticker symbol", value="RELIANCE",
+                               help="e.g. RELIANCE, TCS, INFY, HDFCBANK").strip()
+exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
+horizon_label = st.sidebar.radio(
+    "Investment horizon",
+    options=[HORIZONS["short_term"].label, HORIZONS["long_term"].label],
+)
+horizon = "short_term" if horizon_label == HORIZONS["short_term"].label else "long_term"
+st.sidebar.caption(HORIZONS[horizon].description)
+analyze_clicked = st.sidebar.button("Analyze", type="primary", use_container_width=True)
+
+st.sidebar.markdown("---")
+st.sidebar.warning(
+    "**Disclaimer:** This tool is for educational purposes only and is **not "
+    "financial advice**. Do your own research before investing."
+)
+
+
+# --------------------------------------------------------------------------- #
+# Main
+# --------------------------------------------------------------------------- #
+st.title("Stock Analysis & Investment Suggestion")
+
+if not analyze_clicked:
+    st.info("Enter a ticker in the sidebar, choose a horizon, and click **Analyze**.")
+    st.stop()
+
+if not symbol:
+    st.error("Please enter a ticker symbol.")
+    st.stop()
+
+try:
+    with st.spinner(f"Analyzing {symbol} ({exchange})…"):
+        report = _cached_analyze(symbol, exchange, horizon)
+except DataError as exc:
+    st.error(str(exc))
+    st.stop()
+except Exception as exc:  # noqa: BLE001 -- surface anything else cleanly
+    st.error(f"Unexpected error: {exc}")
+    st.stop()
+
+meta = report.meta
+rec = report.recommendation
+
+# --- Header ----------------------------------------------------------------- #
+st.subheader(f"{meta['name']}  ·  `{meta['ticker']}`")
+c1, c2, c3 = st.columns(3)
+c1.metric("Current price", _fmt_money(meta["price"], meta["currency"]))
+c2.metric("Sector", meta["sector"])
+c3.metric("Horizon", HORIZONS[horizon].label)
+
+# --- Verdict + gauge -------------------------------------------------------- #
+v1, v2 = st.columns([1, 1])
+with v1:
+    st.markdown(
+        f"<div style='padding:1.2rem;border-radius:12px;background:{rec.color};"
+        f"color:white;text-align:center'>"
+        f"<div style='font-size:0.9rem;opacity:0.9'>VERDICT ({HORIZONS[horizon].label})</div>"
+        f"<div style='font-size:2.4rem;font-weight:700'>{rec.verdict}</div>"
+        f"<div style='font-size:0.95rem'>Confidence: {rec.confidence:.0f}%</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Composite {rec.composite_score}/100  ·  "
+        f"Technical {rec.technical_score}  ·  Fundamental {rec.fundamental_score}"
+    )
+with v2:
+    st.plotly_chart(gauge(rec.composite_score, rec.color), use_container_width=True)
+
+# --- Reasoning -------------------------------------------------------------- #
+r1, r2 = st.columns(2)
+with r1:
+    st.markdown("#### ✅ Bullish signals")
+    if rec.bullish_reasons:
+        for reason in rec.bullish_reasons:
+            st.markdown(f"- {reason}")
+    else:
+        st.caption("No notable bullish signals.")
+with r2:
+    st.markdown("#### ⚠️ Bearish signals")
+    if rec.bearish_reasons:
+        for reason in rec.bearish_reasons:
+            st.markdown(f"- {reason}")
+    else:
+        st.caption("No notable bearish signals.")
+
+# --- Charts ----------------------------------------------------------------- #
+st.markdown("### Price & indicators")
+st.plotly_chart(price_chart(report.technical.enriched, meta["name"]), use_container_width=True)
+
+# --- Fundamentals table ----------------------------------------------------- #
+st.markdown("### Fundamental metrics")
+metrics = report.fundamental.metrics
+rows = [{"Metric": k, "Value": _fmt_metric(k, v)} for k, v in metrics.items()]
+st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+st.markdown("---")
+st.caption(
+    "Educational tool — not financial advice. Data via Yahoo Finance (yfinance), "
+    "which may be delayed or incomplete."
+)
