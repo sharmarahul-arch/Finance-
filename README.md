@@ -33,9 +33,11 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
   sidebar navigation.
 - **Searchable stock picker** — like Groww/Zerodha, just type a company name or
   symbol and select it (no need to remember exact tickers). Works for both
-  **NSE and BSE** — pick the exchange and the picker loads that market's stocks
-  (full live lists when online; a bundled list of popular dual-listed names as an
-  offline fallback). The screener uses the same picker to build a watchlist.
+  **NSE and BSE**. The picker loads the **complete current list of listed stocks**
+  from public sources at runtime (it tries NSE's official list, then Zerodha's and
+  Upstox's public instrument dumps, so it works even when NSE bot-blocks the host),
+  with a bundled list of popular names as an offline fallback. The screener uses
+  the same picker to build a watchlist.
 - **Trading-screen header** — live price with a red/green **day-change %** badge.
 - **Favourites / watchlist** — ⭐ save stocks and they persist across sessions;
   quick-load them from the sidebar, or add all your favourites to the screener
