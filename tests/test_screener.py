@@ -14,7 +14,8 @@ def _fake_report(score, verdict="Buy"):
         technical_score=score, fundamental_score=score,
         bullish_reasons=[f"Reason for {score}"], bearish_reasons=[],
     )
-    meta = {"ticker": "X.NS", "name": "Stock", "price": 100.0, "currency": "INR"}
+    meta = {"ticker": "X.NS", "name": "Stock", "price": 100.0,
+            "currency": "INR", "change_pct": 1.5}
     return SimpleNamespace(recommendation=rec, meta=meta)
 
 
@@ -73,3 +74,9 @@ def test_top_reason_populated():
     fn = make_fake_analyze({"AAA": 80})
     summary = screen(["AAA"], analyze_fn=fn)
     assert summary.succeeded[0].top_reason == "Reason for 80"
+
+
+def test_change_pct_propagated():
+    fn = make_fake_analyze({"AAA": 80})
+    summary = screen(["AAA"], analyze_fn=fn)
+    assert summary.succeeded[0].change_pct == 1.5

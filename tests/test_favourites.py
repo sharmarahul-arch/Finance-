@@ -8,6 +8,12 @@ from stock_analyzer import favourites as fav
 @pytest.fixture(autouse=True)
 def temp_store(tmp_path, monkeypatch):
     monkeypatch.setattr(fav, "_PATH", str(tmp_path / "favs.json"))
+    # Ensure tests run in local mode regardless of ambient env / prior configure().
+    monkeypatch.setattr(fav, "_CONFIG",
+                        {"supabase_url": None, "supabase_key": None,
+                         "table": "favourites", "user": "default"})
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
     yield
 
 
@@ -54,9 +60,35 @@ def test_persists_across_reload():
 
 
 def test_readonly_filesystem_does_not_crash(monkeypatch):
-    def _boom(*a, **k):
-        raise OSError("read-only fs")
-    monkeypatch.setattr(fav, "_save", _boom if False else fav._save)
     # Point at an unwritable path; add should not raise.
     monkeypatch.setattr(fav, "_PATH", "/proc/should-not-be-writable/favs.json")
     fav.add_favourite("X", "NSE", "X")  # must not raise
+
+
+def test_storage_mode_local_by_default():
+    assert fav.storage_mode() == "local"
+
+
+def test_configure_enables_cloud_mode():
+    fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
+    assert fav.storage_mode() == "cloud"
+
+
+def test_cloud_read_failure_falls_back_to_local(monkeypatch):
+    fav.add_favourite("LOCAL1", "NSE", "Local One")   # written locally
+    fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
+    monkeypatch.setattr(fav, "_sb_read",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("network")))
+    # Cloud read fails -> must fall back to the local file, not crash.
+    favs = fav.load_favourites()
+    assert any(f["symbol"] == "LOCAL1" for f in favs)
+
+
+def test_cloud_add_failure_falls_back_to_local(monkeypatch):
+    fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
+    monkeypatch.setattr(fav, "_sb_add",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("network")))
+    monkeypatch.setattr(fav, "_sb_read",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("network")))
+    fav.add_favourite("FALLBK", "NSE", "Fallback")    # cloud fails -> local
+    assert fav.is_favourite("FALLBK", "NSE")

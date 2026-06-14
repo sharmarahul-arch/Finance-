@@ -28,6 +28,7 @@ class ScreenResult:
     composite_score: Optional[float] = None
     technical_score: Optional[float] = None
     fundamental_score: Optional[float] = None
+    change_pct: Optional[float] = None   # day change %
     top_reason: Optional[str] = None
     error: Optional[str] = None
 
@@ -85,6 +86,7 @@ def _analyze_one(symbol: str, exchange: str, horizon: str, analyze_fn: Callable)
         composite_score=rec.composite_score,
         technical_score=rec.technical_score,
         fundamental_score=rec.fundamental_score,
+        change_pct=report.meta.get("change_pct"),
         top_reason=top_reason,
     )
 

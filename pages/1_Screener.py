@@ -17,6 +17,15 @@ from stock_analyzer.screener import screen
 
 st.set_page_config(page_title="Screener — Stock Analyzer", page_icon="📊", layout="wide")
 
+try:
+    _url = st.secrets.get("SUPABASE_URL")
+    _key = st.secrets.get("SUPABASE_KEY")
+    if _url and _key:
+        favourites_mod.configure(supabase_url=_url, supabase_key=_key,
+                                 user=st.secrets.get("STOCK_USER", "default"))
+except Exception:
+    pass
+
 DEFAULT_WATCHLIST = [
     "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
     "SBIN", "ITC", "LT", "HINDUNILVR", "BHARTIARTL",
@@ -159,6 +168,7 @@ for i, r in enumerate(ok, start=1):
         "Name": r.name,
         "Verdict": r.verdict,
         "Score": r.composite_score,
+        "Day %": r.change_pct,
         "Technical": r.technical_score,
         "Fundamental": r.fundamental_score,
         "Price": _fmt_money(r.price, r.currency),
@@ -173,13 +183,22 @@ def _style_verdict(val):
     color = color_map.get(val)
     return f"background-color: {color}; color: white;" if color else ""
 
+def _style_change(val):
+    # Red/green text for the day-change column, like a trading screen.
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    return "color: #1a7e2e;" if val >= 0 else "color: #c62828;"
+
 st.markdown("### Ranking")
 try:
     # pandas >=2.1 renamed Styler.applymap -> Styler.map (applymap removed in 3.0).
     styler = df.style
     elementwise = getattr(styler, "map", None) or styler.applymap
-    styled = elementwise(_style_verdict, subset=["Verdict"]).format(
-        {"Score": "{:.1f}", "Technical": "{:.1f}", "Fundamental": "{:.1f}"}
+    styled = (
+        elementwise(_style_verdict, subset=["Verdict"])
+        .pipe(lambda s: (getattr(s, "map", None) or s.applymap)(_style_change, subset=["Day %"]))
+        .format({"Score": "{:.1f}", "Technical": "{:.1f}", "Fundamental": "{:.1f}",
+                 "Day %": lambda v: "—" if v is None or pd.isna(v) else f"{v:+.2f}%"})
     )
     st.dataframe(styled, use_container_width=True, hide_index=True)
 except Exception:

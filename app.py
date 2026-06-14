@@ -21,6 +21,23 @@ from stock_analyzer.engine import analyze_stock
 st.set_page_config(page_title="Stock Analyzer — India", page_icon="📈", layout="wide")
 
 
+def _configure_favourites_backend():
+    """Bridge optional Supabase secrets to the favourites store (cloud mode)."""
+    try:
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_KEY")
+        if url and key:
+            favourites_mod.configure(
+                supabase_url=url, supabase_key=key,
+                user=st.secrets.get("STOCK_USER", "default"),
+            )
+    except Exception:
+        pass  # no secrets file / not configured -> stay in local mode
+
+
+_configure_favourites_backend()
+
+
 # --------------------------------------------------------------------------- #
 # Cached data wrappers (Streamlit-side caching; the library itself stays clean)
 # --------------------------------------------------------------------------- #
@@ -163,7 +180,10 @@ st.sidebar.caption(HORIZONS[horizon].description)
 
 # --- Favourites quick-load -------------------------------------------------- #
 st.sidebar.markdown("---")
-st.sidebar.markdown("### ⭐ Favourites")
+_mode = favourites_mod.storage_mode()
+st.sidebar.markdown(f"### ⭐ Favourites &nbsp; <span style='font-size:0.7rem;opacity:0.6'>"
+                    f"({'☁ cloud' if _mode == 'cloud' else 'local'})</span>",
+                    unsafe_allow_html=True)
 favs = favourites_mod.load_favourites(exchange)
 if not favs:
     st.sidebar.caption(f"No saved {exchange} stocks yet. Use the ⭐ button on a stock.")

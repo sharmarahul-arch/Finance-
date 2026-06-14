@@ -36,8 +36,10 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
 - **Trading-screen header** — live price with a red/green **day-change %** badge.
 - **Favourites / watchlist** — ⭐ save stocks and they persist across sessions;
   quick-load them from the sidebar, or add all your favourites to the screener
-  watchlist in one click. (Stored in a JSON file; override the path with the
-  `STOCK_FAV_PATH` env var.)
+  watchlist in one click. The screener table also shows a red/green **day-change %**
+  column. Favourites are stored locally by default (a JSON file; path overridable
+  with `STOCK_FAV_PATH`) and can optionally use a **durable cloud store** that
+  survives redeploys and syncs across devices — see "Durable favourites" below.
 - **News sentiment** — recent headlines are scored with a finance lexicon and
   folded into the composite (a small, horizon-dependent weight). Headlines are
   shown with their polarity on the single-stock page.
@@ -135,6 +137,38 @@ bt = report.backtest
 print(f"Strategy: {bt.total_return*100:.1f}%  vs  Buy&Hold: {bt.buy_hold_return*100:.1f}%")
 print(f"Trades: {bt.num_trades}  Win rate: {bt.win_rate}  Max DD: {bt.max_drawdown*100:.1f}%")
 ```
+
+## Durable favourites (optional cloud store)
+
+By default favourites are saved to a local JSON file, which resets when a Streamlit
+Cloud app redeploys. To make them durable and shared across devices, point the app
+at a free [Supabase](https://supabase.com) project:
+
+1. Create a Supabase project, then in the SQL editor create the table:
+
+   ```sql
+   create table favourites (
+     id bigint generated always as identity primary key,
+     user_id text not null default 'default',
+     symbol text not null,
+     exchange text not null,
+     name text,
+     unique (user_id, symbol, exchange)
+   );
+   ```
+
+2. In Streamlit Cloud, open **Manage app → Settings → Secrets** and add:
+
+   ```toml
+   SUPABASE_URL = "https://YOUR-PROJECT.supabase.co"
+   SUPABASE_KEY = "YOUR-ANON-OR-SERVICE-KEY"
+   STOCK_USER   = "default"   # optional: namespace per user
+   ```
+
+   (Locally, set the same values as environment variables instead.)
+
+The sidebar shows whether favourites are in **local** or **☁ cloud** mode. If the
+cloud store is ever unreachable, the app automatically falls back to local storage.
 
 ## Tuning
 
