@@ -41,6 +41,16 @@ def _fmt_cap(value):
     return f"₹{value/1e7:,.0f} Cr"
 
 
+def _go_analyse(symbol: str, exch: str):
+    """Pre-select the stock and jump to the main analysis page."""
+    st.session_state["symbol"] = symbol
+    st.session_state["exchange"] = exch
+    if hasattr(st, "switch_page"):
+        st.switch_page("app.py")
+    else:  # very old Streamlit
+        st.info(f"Selected {symbol}. Open the main analysis page from the sidebar.")
+
+
 # --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
@@ -134,6 +144,19 @@ for col, r in zip(cols, top):
         )
         if r.top_reason:
             st.caption(f"💡 {r.top_reason}")
+        if col.button("📊 Open analysis", key=f"card_open_{r.symbol}",
+                      use_container_width=True):
+            _go_analyse(r.symbol, exchange)
+
+# --- Clickable list — every pick opens the full analysis page --------------- #
+st.markdown("### Open full analysis")
+st.caption("Click any stock to open its full breakdown, charts and risk plan.")
+for i, r in enumerate(filtered, start=1):
+    day = "" if r.change_pct is None else f"  ·  {r.change_pct:+.2f}%"
+    label = (f"{i}. {r.name or r.symbol}  ({r.symbol})  —  {r.verdict}  ·  "
+             f"score {r.composite_score}  ·  {r.cap_category or '—'} cap{day}")
+    if st.button(label, key=f"open_{r.symbol}", use_container_width=True):
+        _go_analyse(r.symbol, exchange)
 
 # --- Full ranked table ------------------------------------------------------ #
 rows = [{
