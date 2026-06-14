@@ -28,6 +28,13 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
   horizon-weighted score in one go (parallelised), with a sortable table,
   score bar chart and CSV export. Available from the **Screener** page in the
   sidebar navigation.
+- **News sentiment** — recent headlines are scored with a finance lexicon and
+  folded into the composite (a small, horizon-dependent weight). Headlines are
+  shown with their polarity on the single-stock page.
+- **Signal backtest** — on the single-stock page, see how a long-only strategy
+  that buys on a strong technical score and exits when it weakens would have
+  performed on the stock's history, compared against buy-and-hold (return, win
+  rate, max drawdown, Sharpe, equity curve). Thresholds are adjustable.
 
 Data comes from **Yahoo Finance** via the free [`yfinance`](https://pypi.org/project/yfinance/)
 library — no API key required.
@@ -77,8 +84,10 @@ Finance-/
 │   ├── indicators.py          # pandas/numpy indicator math (SMA/EMA/RSI/MACD/BB/ADX)
 │   ├── technical.py           # technical signals + aggregate score
 │   ├── fundamental.py         # fundamental signals + aggregate score
-│   ├── recommendation.py      # horizon-weighted verdict + ranked reasons
+│   ├── recommendation.py      # horizon-weighted verdict + ranked reasons (incl. news)
 │   ├── screener.py            # parallel multi-stock ranking
+│   ├── sentiment.py           # finance-lexicon news sentiment (offline)
+│   ├── backtest.py            # backtest the technical signals vs buy-and-hold
 │   ├── engine.py              # orchestration: ticker -> data -> analysis -> verdict
 │   └── models.py              # shared Signal dataclass
 ├── tests/                     # offline unit tests
@@ -104,6 +113,17 @@ from stock_analyzer.screener import screen
 summary = screen(["RELIANCE", "TCS", "INFY"], exchange="NSE", horizon="long_term")
 for r in summary.ranked:
     print(f"{r.symbol:12} {r.verdict:11} {r.composite_score}")
+```
+
+Backtest the signals on a price history:
+
+```python
+from stock_analyzer.engine import analyze_stock
+
+report = analyze_stock("TCS", horizon="short_term", include_backtest=True)
+bt = report.backtest
+print(f"Strategy: {bt.total_return*100:.1f}%  vs  Buy&Hold: {bt.buy_hold_return*100:.1f}%")
+print(f"Trades: {bt.num_trades}  Win rate: {bt.win_rate}  Max DD: {bt.max_drawdown*100:.1f}%")
 ```
 
 ## Tuning

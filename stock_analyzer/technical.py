@@ -173,6 +173,93 @@ def _aggregate(signals: List[Signal]) -> float:
     return float(np.mean(usable))
 
 
+def score_series(enriched: pd.DataFrame) -> pd.Series:
+    """Per-bar aggregate technical score (0-100, 50 = neutral) over the whole history.
+
+    Vectorized counterpart of :func:`evaluate` -- it applies the same component
+    rules row-by-row so the backtest scores each historical bar exactly the way the
+    live engine scores the latest bar. Components that are unavailable (NaN) on a
+    given row are excluded from that row's average, matching ``evaluate``.
+    """
+    close = enriched["Close"]
+    sma50 = enriched.get("SMA50")
+    sma200 = enriched.get("SMA200")
+    rsi = enriched.get("RSI")
+    macd_line = enriched.get("MACD")
+    macd_sig = enriched.get("MACD_SIGNAL")
+    bb_upper = enriched.get("BB_UPPER")
+    bb_lower = enriched.get("BB_LOWER")
+    adx = enriched.get("ADX")
+    vol = enriched.get("Volume")
+    vol_avg = enriched.get("VOL_AVG")
+
+    nan = pd.Series(np.nan, index=enriched.index)
+    components = {}
+
+    # Trend (MA stack)
+    if sma50 is not None and sma200 is not None:
+        components["trend"] = pd.Series(
+            np.select(
+                [close > sma50, close > sma200],   # checked top-down
+                [np.where(sma50 > sma200, 85.0, 65.0), 65.0],
+                default=np.where((close < sma50) & (sma50 < sma200), 15.0, 35.0),
+            ),
+            index=enriched.index,
+        ).where(sma50.notna() & sma200.notna())
+
+        # Golden / death cross
+        components["cross"] = pd.Series(
+            np.where(sma50 > sma200, 70.0, 30.0), index=enriched.index
+        ).where(sma50.notna() & sma200.notna())
+
+    # RSI
+    if rsi is not None:
+        rsi_score = pd.Series(
+            np.select(
+                [rsi < config.RSI_OVERSOLD, rsi > config.RSI_OVERBOUGHT],
+                [75.0, 25.0],
+                default=(40 + (rsi - config.RSI_OVERSOLD)
+                         / (config.RSI_OVERBOUGHT - config.RSI_OVERSOLD) * 20).clip(0, 100),
+            ),
+            index=enriched.index,
+        ).where(rsi.notna())
+        components["rsi"] = rsi_score
+
+    # MACD
+    if macd_line is not None and macd_sig is not None:
+        components["macd"] = pd.Series(
+            np.where(macd_line > macd_sig, 70.0, 30.0), index=enriched.index
+        ).where(macd_line.notna() & macd_sig.notna())
+
+    # Bollinger position
+    if bb_upper is not None and bb_lower is not None:
+        components["bb"] = pd.Series(
+            np.select([close <= bb_lower, close >= bb_upper], [65.0, 35.0], default=50.0),
+            index=enriched.index,
+        ).where(bb_upper.notna() & bb_lower.notna())
+
+    # ADX (trend strength modifier)
+    if adx is not None:
+        components["adx"] = pd.Series(
+            np.where(adx >= config.ADX_TREND_THRESHOLD, 55.0, 45.0), index=enriched.index
+        ).where(adx.notna())
+
+    # Volume — only contributes at extremes (matches evaluate)
+    if vol is not None and vol_avg is not None:
+        ratio = vol / vol_avg.replace(0.0, np.nan)
+        components["vol"] = pd.Series(
+            np.select([ratio >= 1.5, ratio <= 0.5], [58.0, 45.0], default=np.nan),
+            index=enriched.index,
+        )
+
+    if not components:
+        return pd.Series(50.0, index=enriched.index)
+
+    matrix = pd.concat(components.values(), axis=1)
+    # Row-wise mean of available components; fall back to neutral where all NaN.
+    return matrix.mean(axis=1, skipna=True).fillna(50.0)
+
+
 # Public convenience alias matching the package __init__ export.
 def analyze_technical(df: pd.DataFrame) -> TechnicalResult:
     return evaluate(df)

@@ -90,6 +90,34 @@ def fetch_fundamentals(ticker: str) -> dict:
     return info
 
 
+def fetch_news(ticker: str, limit: int = 10) -> list:
+    """Return up to ``limit`` recent headline strings for ``ticker`` (best-effort).
+
+    yfinance's news payload shape has varied over versions, so we probe the common
+    locations for a title. Returns an empty list on any failure rather than raising,
+    so the rest of the analysis still proceeds.
+    """
+    import yfinance as yf
+
+    try:
+        raw = yf.Ticker(ticker).news or []
+    except Exception:
+        return []
+
+    headlines = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        # Newer yfinance nests fields under "content".
+        content = item.get("content") if isinstance(item.get("content"), dict) else {}
+        title = item.get("title") or content.get("title")
+        if title:
+            headlines.append(str(title).strip())
+        if len(headlines) >= limit:
+            break
+    return headlines
+
+
 def get_company_meta(ticker: str, info: Optional[dict] = None) -> dict:
     """Return a small dict of display metadata: name, sector, price, currency."""
     if info is None:

@@ -58,3 +58,33 @@ def test_confidence_in_range(uptrend_df, strong_fundamentals):
     fund = eval_fundamental(strong_fundamentals)
     rec = recommend(tech, fund, horizon="long_term")
     assert 0 <= rec.confidence <= 100
+
+
+def test_news_none_is_backward_compatible(uptrend_df, strong_fundamentals):
+    tech = eval_technical(uptrend_df)
+    fund = eval_fundamental(strong_fundamentals)
+    base = recommend(tech, fund, horizon="long_term")
+    with_none = recommend(tech, fund, horizon="long_term", news=None)
+    assert base.composite_score == with_none.composite_score
+    assert base.news_score is None
+
+
+def test_positive_news_raises_composite(downtrend_df, weak_fundamentals):
+    from stock_analyzer.sentiment import analyze_news
+    tech = eval_technical(downtrend_df)
+    fund = eval_fundamental(weak_fundamentals)
+    base = recommend(tech, fund, horizon="short_term")
+    good_news = analyze_news(["Stock surges to record high on strong profit beat"])
+    boosted = recommend(tech, fund, horizon="short_term", news=good_news)
+    assert boosted.composite_score > base.composite_score
+    assert boosted.news_score is not None
+
+
+def test_empty_news_does_not_change_score(uptrend_df, strong_fundamentals):
+    from stock_analyzer.sentiment import analyze_news
+    tech = eval_technical(uptrend_df)
+    fund = eval_fundamental(strong_fundamentals)
+    base = recommend(tech, fund, horizon="long_term")
+    empty = recommend(tech, fund, horizon="long_term", news=analyze_news([]))
+    assert base.composite_score == empty.composite_score
+    assert empty.news_score is None

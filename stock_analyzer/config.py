@@ -68,6 +68,9 @@ class HorizonProfile:
     default_period: str   # yfinance history period
     default_interval: str
     description: str
+    # Fraction of the final composite given to news sentiment (when available).
+    # The remaining (1 - news_weight) is split between technical & fundamental.
+    news_weight: float = 0.0
 
 
 HORIZONS: Dict[str, HorizonProfile] = {
@@ -79,6 +82,7 @@ HORIZONS: Dict[str, HorizonProfile] = {
         default_period="6mo",
         default_interval="1d",
         description="Emphasises price momentum, trend and entry timing.",
+        news_weight=0.15,
     ),
     "long_term": HorizonProfile(
         key="long_term",
@@ -88,6 +92,7 @@ HORIZONS: Dict[str, HorizonProfile] = {
         default_period="5y",
         default_interval="1wk",
         description="Emphasises business quality, valuation and growth.",
+        news_weight=0.05,
     ),
 }
 

@@ -11,6 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from stock_analyzer import data as data_mod
+from stock_analyzer.backtest import run_backtest
 from stock_analyzer.config import HORIZONS
 from stock_analyzer.data import DataError
 from stock_analyzer.engine import analyze_stock
@@ -23,7 +24,7 @@ st.set_page_config(page_title="Stock Analyzer — India", page_icon="📈", layo
 # --------------------------------------------------------------------------- #
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_analyze(symbol: str, exchange: str, horizon: str):
-    return analyze_stock(symbol, exchange=exchange, horizon=horizon)
+    return analyze_stock(symbol, exchange=exchange, horizon=horizon, include_news=True)
 
 
 def _fmt_money(value, currency="INR"):
@@ -183,10 +184,13 @@ with v1:
         f"</div>",
         unsafe_allow_html=True,
     )
-    st.caption(
+    caption = (
         f"Composite {rec.composite_score}/100  ·  "
         f"Technical {rec.technical_score}  ·  Fundamental {rec.fundamental_score}"
     )
+    if rec.news_score is not None:
+        caption += f"  ·  News {rec.news_score}"
+    st.caption(caption)
 with v2:
     st.plotly_chart(gauge(rec.composite_score, rec.color), use_container_width=True)
 
@@ -216,6 +220,60 @@ st.markdown("### Fundamental metrics")
 metrics = report.fundamental.metrics
 rows = [{"Metric": k, "Value": _fmt_metric(k, v)} for k, v in metrics.items()]
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+# --- News sentiment --------------------------------------------------------- #
+st.markdown("### 📰 News sentiment")
+news = report.news
+if news is None or news.headline_count == 0:
+    st.caption("No recent headlines found for this stock.")
+else:
+    st.caption(
+        f"{news.headline_count} recent headlines · sentiment score "
+        f"{news.score}/100 ({news.signal.status})."
+    )
+    for item in news.per_headline:
+        pol = item["polarity"]
+        emoji = "🟢" if pol > 0.15 else ("🔴" if pol < -0.15 else "⚪")
+        st.markdown(f"{emoji} {item['headline']}  &nbsp; `({pol:+.2f})`", unsafe_allow_html=True)
+
+# --- Strategy backtest ------------------------------------------------------ #
+st.markdown("### 🧪 Signal backtest")
+st.caption(
+    "How a long-only strategy that buys on a strong technical score and exits when "
+    "it weakens would have performed on this price history — vs simply buying & holding."
+)
+bc1, bc2 = st.columns(2)
+buy_th = bc1.slider("Buy when score ≥", 50, 90, 60, step=5)
+exit_th = bc2.slider("Exit when score ≤", 10, 50, 45, step=5)
+
+bt = run_backtest(report.price_df, buy_threshold=buy_th, exit_threshold=exit_th)
+if not bt.ok:
+    st.info(bt.message)
+else:
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Strategy return", f"{bt.total_return*100:.1f}%")
+    m2.metric("Buy & hold return", f"{bt.buy_hold_return*100:.1f}%",
+              delta=f"{(bt.total_return-bt.buy_hold_return)*100:.1f}% vs B&H")
+    m3.metric("Win rate", f"{bt.win_rate*100:.0f}%" if bt.win_rate is not None else "—")
+    m4.metric("Max drawdown", f"{bt.max_drawdown*100:.1f}%")
+    n1, n2, n3 = st.columns(3)
+    n1.metric("Trades", bt.num_trades)
+    n2.metric("Time in market", f"{bt.exposure*100:.0f}%")
+    n3.metric("Sharpe", f"{bt.sharpe:.2f}" if bt.sharpe is not None else "—")
+
+    eq = go.Figure()
+    eq.add_trace(go.Scatter(x=bt.equity_curve.index, y=bt.equity_curve,
+                            name="Strategy", line=dict(color="#1a7e2e")))
+    eq.add_trace(go.Scatter(x=bt.buy_hold_curve.index, y=bt.buy_hold_curve,
+                            name="Buy & hold", line=dict(color="#888", dash="dot")))
+    eq.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10),
+                     yaxis_title="Growth of ₹1",
+                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    st.plotly_chart(eq, use_container_width=True)
+    st.caption(
+        "Backtests are hypothetical, exclude costs/slippage/taxes, and past "
+        "performance does not guarantee future results."
+    )
 
 st.markdown("---")
 st.caption(
