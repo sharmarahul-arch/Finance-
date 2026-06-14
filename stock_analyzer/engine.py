@@ -54,7 +54,8 @@ def analyze_stock(
         interval=interval or profile.default_interval,
     )
     info = data_mod.fetch_fundamentals(ticker)
-    meta = data_mod.get_company_meta(ticker, info)
+    quote = data_mod.fetch_fast_quote(ticker)
+    meta = data_mod.get_company_meta(ticker, info, quote=quote)
 
     technical = eval_technical(price_df)
     fundamental = eval_fundamental(info)

@@ -47,6 +47,19 @@ def test_company_meta_handles_missing_prev_close():
     assert meta["change_pct"] is None
 
 
+def test_company_meta_prefers_fresh_quote():
+    from stock_analyzer.data import get_company_meta
+    # The fresher fast_info quote should override the slower .info fields.
+    meta = get_company_meta(
+        "TEST.NS",
+        {"longName": "Test Co", "currentPrice": 100.0, "regularMarketPreviousClose": 99.0},
+        quote={"price": 105.0, "previous_close": 100.0},
+    )
+    assert meta["price"] == 105.0
+    assert meta["previous_close"] == 100.0
+    assert abs(meta["change"] - 5.0) < 1e-9
+
+
 def test_guide_signals_present_and_scored():
     info = {
         "currentRatio": 2.0,        # comfortable

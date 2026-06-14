@@ -118,17 +118,61 @@ def fetch_news(ticker: str, limit: int = 10) -> list:
     return headlines
 
 
-def get_company_meta(ticker: str, info: Optional[dict] = None) -> dict:
-    """Return a small dict of display metadata: name, sector, price, currency."""
+def fetch_fast_quote(ticker: str) -> dict:
+    """Return the freshest available price snapshot via yfinance ``fast_info``.
+
+    ``fast_info`` is typically fresher and lighter than ``.info`` and tracks closer
+    to a broker quote (though Yahoo data is still usually delayed ~15 min for
+    NSE/BSE). Returns ``{"price", "previous_close"}`` (values may be None).
+    """
+    import yfinance as yf
+
+    out = {"price": None, "previous_close": None}
+    try:
+        fi = yf.Ticker(ticker).fast_info
+
+        def _pick(*names):
+            for n in names:
+                # fast_info supports both attribute and mapping access across versions.
+                try:
+                    v = getattr(fi, n)
+                except Exception:
+                    try:
+                        v = fi[n]
+                    except Exception:
+                        v = None
+                if isinstance(v, (int, float)) and v == v:  # not None / NaN
+                    return float(v)
+            return None
+
+        out["price"] = _pick("last_price", "lastPrice")
+        out["previous_close"] = _pick("previous_close", "previousClose", "regular_market_previous_close")
+    except Exception:
+        pass
+    return out
+
+
+def get_company_meta(ticker: str, info: Optional[dict] = None, quote: Optional[dict] = None) -> dict:
+    """Return a small dict of display metadata: name, sector, price, currency.
+
+    If ``quote`` (from :func:`fetch_fast_quote`) is supplied, its fresher price /
+    previous close take precedence over the slower ``.info`` fields.
+    """
     if info is None:
         info = fetch_fundamentals(ticker)
+    quote = quote or {}
 
     price = (
-        info.get("currentPrice")
+        quote.get("price")
+        or info.get("currentPrice")
         or info.get("regularMarketPrice")
         or info.get("previousClose")
     )
-    prev_close = info.get("regularMarketPreviousClose") or info.get("previousClose")
+    prev_close = (
+        quote.get("previous_close")
+        or info.get("regularMarketPreviousClose")
+        or info.get("previousClose")
+    )
 
     change = change_pct = None
     if price is not None and prev_close:

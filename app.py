@@ -182,6 +182,11 @@ horizon_label = st.sidebar.radio(
 horizon = "short_term" if horizon_label == HORIZONS["short_term"].label else "long_term"
 st.sidebar.caption(HORIZONS[horizon].description)
 
+if st.sidebar.button("🔄 Refresh data", use_container_width=True,
+                     help="Clear the 15-min cache and re-fetch the latest from Yahoo."):
+    st.cache_data.clear()
+    st.rerun()
+
 # --- Favourites quick-load -------------------------------------------------- #
 st.sidebar.markdown("---")
 _mode = favourites_mod.storage_mode()
@@ -256,6 +261,10 @@ c1, c2, c3 = st.columns(3)
 c1.metric("Live price", _fmt_money(meta["price"], meta["currency"]), delta=day_delta)
 c2.metric("Sector", meta["sector"])
 c3.metric("Horizon", HORIZONS[horizon].label)
+st.caption(
+    "ℹ️ Prices via Yahoo Finance are usually **delayed ~15 minutes** and can differ "
+    "slightly from your broker's real-time feed. Use 🔄 Refresh for the latest."
+)
 
 # --- Verdict + gauge -------------------------------------------------------- #
 v1, v2 = st.columns([1, 1])
