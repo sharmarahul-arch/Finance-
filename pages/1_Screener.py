@@ -30,8 +30,8 @@ def _cached_screen(symbols: tuple, exchange: str, horizon: str):
 
 
 @st.cache_data(ttl=86400, show_spinner="Loading stock list…")
-def _load_universe():
-    return universe_mod.load_universe()
+def _load_universe(exchange: str):
+    return universe_mod.load_universe(exchange)
 
 
 def _fmt_money(value, currency="INR"):
@@ -50,19 +50,20 @@ def _fmt_money(value, currency="INR"):
 st.sidebar.title("📊 Screener")
 st.sidebar.caption("Rank a watchlist by Buy/Sell score")
 
-universe = _load_universe()
+exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
+
+universe = _load_universe(exchange)
 all_symbols = [r["symbol"] for r in universe]
 labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
 defaults = [s for s in DEFAULT_WATCHLIST if s in all_symbols]
 
 selected = st.sidebar.multiselect(
-    "🔍 Build your watchlist",
+    f"🔍 Build your watchlist ({exchange})",
     options=all_symbols,
     default=defaults,
     format_func=lambda s: labels.get(s, s),
     help=f"Search and add stocks by name or symbol. Up to {MAX_TICKERS}.",
 )
-exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
 horizon_label = st.sidebar.radio(
     "Investment horizon",
     options=[HORIZONS["short_term"].label, HORIZONS["long_term"].label],

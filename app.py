@@ -29,8 +29,8 @@ def _cached_analyze(symbol: str, exchange: str, horizon: str):
 
 
 @st.cache_data(ttl=86400, show_spinner="Loading stock list…")
-def _load_universe():
-    return universe_mod.load_universe()
+def _load_universe(exchange: str):
+    return universe_mod.load_universe(exchange)
 
 
 def _fmt_money(value, currency="INR"):
@@ -127,19 +127,20 @@ def gauge(score: float, color: str):
 st.sidebar.title("📈 Stock Analyzer")
 st.sidebar.caption("Technical + fundamental analysis for Indian stocks")
 
-universe = _load_universe()
+exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
+
+universe = _load_universe(exchange)
 options = [r["symbol"] for r in universe]
 labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
 default_idx = options.index("RELIANCE") if "RELIANCE" in options else 0
 
 symbol = st.sidebar.selectbox(
-    "🔍 Search a stock",
+    f"🔍 Search a stock ({exchange})",
     options=options,
     index=default_idx,
     format_func=lambda s: labels.get(s, s),
     help="Type a company name or symbol, e.g. Reliance, Infosys, HDFC…",
 )
-exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
 horizon_label = st.sidebar.radio(
     "Investment horizon",
     options=[HORIZONS["short_term"].label, HORIZONS["long_term"].label],

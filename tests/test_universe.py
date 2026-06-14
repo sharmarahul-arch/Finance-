@@ -29,6 +29,15 @@ def test_search_matches_name_and_symbol(monkeypatch):
     universe.load_universe.cache_clear()
 
 
+def test_bse_offline_falls_back_to_bundled(monkeypatch):
+    universe.load_universe.cache_clear()
+    monkeypatch.setattr(universe, "_download_bse",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("offline")))
+    rows = universe.load_universe(market="BSE", prefer_live=True)
+    assert len(rows) > 50  # bundled dual-listed names work on BSE (.BO) too
+    universe.load_universe.cache_clear()
+
+
 def test_parse_nse_csv_handles_spaced_headers():
     csv_text = (
         "SYMBOL, NAME OF COMPANY, SERIES, DATE OF LISTING\n"

@@ -29,9 +29,10 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
   score bar chart and CSV export. Available from the **Screener** page in the
   sidebar navigation.
 - **Searchable stock picker** — like Groww/Zerodha, just type a company name or
-  symbol and select it (no need to remember exact tickers). The full NSE equity
-  list loads automatically when online, with a bundled list of popular stocks as
-  an offline fallback. The screener uses the same picker to build a watchlist.
+  symbol and select it (no need to remember exact tickers). Works for both
+  **NSE and BSE** — pick the exchange and the picker loads that market's stocks
+  (full live lists when online; a bundled list of popular dual-listed names as an
+  offline fallback). The screener uses the same picker to build a watchlist.
 - **News sentiment** — recent headlines are scored with a finance lexicon and
   folded into the composite (a small, horizon-dependent weight). Headlines are
   shown with their polarity on the single-stock page.
