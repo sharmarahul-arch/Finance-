@@ -117,6 +117,17 @@ def load_universe(market: str = "NSE", prefer_live: bool = True) -> List[Dict[st
     return unique
 
 
+def curated_universe() -> List[Dict[str, str]]:
+    """The bundled list of large, liquid, well-known names.
+
+    Used by the Top Picks scan as a fast, relevant candidate pool (scanning the
+    full live list would be slow and include illiquid micro-caps).
+    """
+    rows = _load_bundled()
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
 def search(query: str, market: str = "NSE", limit: int = 50) -> List[Dict[str, str]]:
     """Simple case-insensitive substring search over symbol and name."""
     q = (query or "").strip().lower()

@@ -8,15 +8,16 @@ from stock_analyzer.data import DataError
 from stock_analyzer.screener import screen
 
 
-def _fake_report(score, verdict="Buy"):
+def _fake_report(score, verdict="Buy", sector="Tech", market_cap=3e11):
     rec = SimpleNamespace(
         verdict=verdict, color="#4caf50", composite_score=score,
         technical_score=score, fundamental_score=score,
         bullish_reasons=[f"Reason for {score}"], bearish_reasons=[],
     )
     meta = {"ticker": "X.NS", "name": "Stock", "price": 100.0,
-            "currency": "INR", "change_pct": 1.5}
-    return SimpleNamespace(recommendation=rec, meta=meta)
+            "currency": "INR", "change_pct": 1.5, "sector": sector}
+    fundamental = SimpleNamespace(metrics={"Market cap": market_cap})
+    return SimpleNamespace(recommendation=rec, meta=meta, fundamental=fundamental)
 
 
 def make_fake_analyze(scores):
@@ -80,3 +81,21 @@ def test_change_pct_propagated():
     fn = make_fake_analyze({"AAA": 80})
     summary = screen(["AAA"], analyze_fn=fn)
     assert summary.succeeded[0].change_pct == 1.5
+
+
+def test_sector_and_cap_propagated():
+    fn = make_fake_analyze({"AAA": 80})
+    summary = screen(["AAA"], analyze_fn=fn)
+    r = summary.succeeded[0]
+    assert r.sector == "Tech"
+    assert r.market_cap == 3e11
+    assert r.cap_category == "Large"   # 3e11 = ₹30,000 cr
+
+
+def test_cap_bucket_thresholds():
+    from stock_analyzer.screener import cap_bucket
+    assert cap_bucket(3e11) == "Large"      # ₹30,000 cr
+    assert cap_bucket(1e11) == "Mid"        # ₹10,000 cr
+    assert cap_bucket(1e10) == "Small"      # ₹1,000 cr
+    assert cap_bucket(None) is None
+    assert cap_bucket(0) is None

@@ -24,6 +24,9 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
 - **Output** — a colour-coded verdict + confidence, a 0–100 composite score gauge,
   the ranked bullish/bearish signals behind it, interactive price/RSI/MACD charts,
   and a fundamentals table.
+- **Top Picks (auto-discovery)** — scans a pool of liquid stocks and surfaces the
+  highest Buy-rated names automatically, with **market-cap (Large/Mid/Small)** and
+  **sector** filters. The top 3 are highlighted as cards; the rest in a ranked table.
 - **Multi-stock screener** — paste a watchlist and rank every stock by its
   horizon-weighted score in one go (parallelised), with a sortable table,
   score bar chart and CSV export. Available from the **Screener** page in the
@@ -94,7 +97,8 @@ Finance-/
 ├── app.py                     # Streamlit UI — single-stock page (home)
 ├── pages/
 │   ├── 1_Screener.py          # Streamlit UI — multi-stock screener page
-│   └── 2_Playbook.py          # Streamlit UI — the analysis guide / framework
+│   ├── 2_Playbook.py          # Streamlit UI — the analysis guide / framework
+│   └── 3_Top_Picks.py         # Streamlit UI — auto top-buy discovery + filters
 ├── stock_analyzer/            # pure-Python analysis library (UI-free, testable)
 │   ├── config.py              # indicator params, thresholds, horizon profiles, verdict bands
 │   ├── data.py                # yfinance fetching + ticker normalization

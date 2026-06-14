@@ -15,6 +15,22 @@ from .config import HORIZONS
 from .data import DataError
 from .engine import analyze_stock
 
+# Market-cap category thresholds (₹ crore). Rough but practical buckets.
+CAP_LARGE_CR = 20000.0
+CAP_MID_CR = 5000.0
+
+
+def cap_bucket(market_cap: Optional[float]) -> Optional[str]:
+    """Bucket an absolute market cap (₹) into Large / Mid / Small."""
+    if not market_cap or market_cap <= 0:
+        return None
+    crore = market_cap / 1e7  # 1 crore = 1e7
+    if crore >= CAP_LARGE_CR:
+        return "Large"
+    if crore >= CAP_MID_CR:
+        return "Mid"
+    return "Small"
+
 
 @dataclass
 class ScreenResult:
@@ -29,6 +45,9 @@ class ScreenResult:
     technical_score: Optional[float] = None
     fundamental_score: Optional[float] = None
     change_pct: Optional[float] = None   # day change %
+    sector: Optional[str] = None
+    market_cap: Optional[float] = None
+    cap_category: Optional[str] = None   # "Large" | "Mid" | "Small"
     top_reason: Optional[str] = None
     error: Optional[str] = None
 
@@ -75,6 +94,8 @@ def _analyze_one(symbol: str, exchange: str, horizon: str, analyze_fn: Callable)
     top_reason = rec.bullish_reasons[0] if rec.bullish_reasons else (
         rec.bearish_reasons[0] if rec.bearish_reasons else None
     )
+    fund = getattr(report, "fundamental", None)
+    market_cap = fund.metrics.get("Market cap") if fund is not None else None
     return ScreenResult(
         symbol=symbol,
         ticker=report.meta.get("ticker"),
@@ -87,6 +108,9 @@ def _analyze_one(symbol: str, exchange: str, horizon: str, analyze_fn: Callable)
         technical_score=rec.technical_score,
         fundamental_score=rec.fundamental_score,
         change_pct=report.meta.get("change_pct"),
+        sector=report.meta.get("sector"),
+        market_cap=market_cap,
+        cap_category=cap_bucket(market_cap),
         top_reason=top_reason,
     )
 
