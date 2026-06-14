@@ -7,6 +7,7 @@ and reused independently of the Streamlit front-end (``app.py``).
 from .recommendation import Recommendation, recommend
 from .technical import TechnicalResult, analyze_technical
 from .fundamental import FundamentalResult, analyze_fundamental
+from .screener import ScreenResult, ScreenSummary, screen
 from .config import HORIZONS
 
 __all__ = [
@@ -16,5 +17,8 @@ __all__ = [
     "analyze_technical",
     "FundamentalResult",
     "analyze_fundamental",
+    "ScreenResult",
+    "ScreenSummary",
+    "screen",
     "HORIZONS",
 ]

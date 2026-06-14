@@ -24,6 +24,10 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
 - **Output** — a colour-coded verdict + confidence, a 0–100 composite score gauge,
   the ranked bullish/bearish signals behind it, interactive price/RSI/MACD charts,
   and a fundamentals table.
+- **Multi-stock screener** — paste a watchlist and rank every stock by its
+  horizon-weighted score in one go (parallelised), with a sortable table,
+  score bar chart and CSV export. Available from the **Screener** page in the
+  sidebar navigation.
 
 Data comes from **Yahoo Finance** via the free [`yfinance`](https://pypi.org/project/yfinance/)
 library — no API key required.
@@ -64,7 +68,9 @@ Tests run fully offline using synthetic data (no network calls).
 
 ```
 Finance-/
-├── app.py                     # Streamlit UI (presentation only)
+├── app.py                     # Streamlit UI — single-stock page (home)
+├── pages/
+│   └── 1_Screener.py          # Streamlit UI — multi-stock screener page
 ├── stock_analyzer/            # pure-Python analysis library (UI-free, testable)
 │   ├── config.py              # indicator params, thresholds, horizon profiles, verdict bands
 │   ├── data.py                # yfinance fetching + ticker normalization
@@ -72,6 +78,7 @@ Finance-/
 │   ├── technical.py           # technical signals + aggregate score
 │   ├── fundamental.py         # fundamental signals + aggregate score
 │   ├── recommendation.py      # horizon-weighted verdict + ranked reasons
+│   ├── screener.py            # parallel multi-stock ranking
 │   ├── engine.py              # orchestration: ticker -> data -> analysis -> verdict
 │   └── models.py              # shared Signal dataclass
 ├── tests/                     # offline unit tests
@@ -87,6 +94,16 @@ report = analyze_stock("TCS", exchange="NSE", horizon="long_term")
 print(report.recommendation.verdict, report.recommendation.composite_score)
 for reason in report.recommendation.bullish_reasons:
     print("+", reason)
+```
+
+Screen and rank a watchlist:
+
+```python
+from stock_analyzer.screener import screen
+
+summary = screen(["RELIANCE", "TCS", "INFY"], exchange="NSE", horizon="long_term")
+for r in summary.ranked:
+    print(f"{r.symbol:12} {r.verdict:11} {r.composite_score}")
 ```
 
 ## Tuning
