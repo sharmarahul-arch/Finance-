@@ -143,15 +143,18 @@ def _style_verdict(val):
     color = color_map.get(val)
     return f"background-color: {color}; color: white;" if color else ""
 
-# pandas >=2.1 renamed Styler.applymap -> Styler.map (applymap removed in 3.0).
-_style = df.style
-_elementwise = getattr(_style, "map", None) or _style.applymap
-styled = _elementwise(_style_verdict, subset=["Verdict"]).format(
-    {"Score": "{:.1f}", "Technical": "{:.1f}", "Fundamental": "{:.1f}"}
-)
-
 st.markdown("### Ranking")
-st.dataframe(styled, use_container_width=True, hide_index=True)
+try:
+    # pandas >=2.1 renamed Styler.applymap -> Styler.map (applymap removed in 3.0).
+    styler = df.style
+    elementwise = getattr(styler, "map", None) or styler.applymap
+    styled = elementwise(_style_verdict, subset=["Verdict"]).format(
+        {"Score": "{:.1f}", "Technical": "{:.1f}", "Fundamental": "{:.1f}"}
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+except Exception:
+    # Styler API differs across pandas versions — fall back to a plain table.
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
 st.download_button(
     "⬇️ Download as CSV",
