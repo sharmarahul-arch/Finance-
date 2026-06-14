@@ -69,6 +69,25 @@ def storage_mode() -> str:
     return "cloud" if _cloud_cfg() else "local"
 
 
+def check_connection() -> Dict[str, object]:
+    """Probe the configured store and report reachability.
+
+    Returns ``{"mode", "ok", "message"}`` where ``ok`` is True/False for the cloud
+    store, or None when running in local mode.
+    """
+    cfg = _cloud_cfg()
+    if not cfg:
+        return {"mode": "local", "ok": None,
+                "message": "Favourites are stored locally on this deployment."}
+    try:
+        rows = _sb_read(cfg)
+        return {"mode": "cloud", "ok": True,
+                "message": f"Connected ✓  ({len(rows)} favourite(s) in cloud store)."}
+    except Exception as exc:  # noqa: BLE001 -- surface the reason to the user
+        return {"mode": "cloud", "ok": False,
+                "message": f"Cloud store unreachable — using local fallback. ({exc})"}
+
+
 def _sb_headers(key: str) -> dict:
     return {
         "apikey": key,

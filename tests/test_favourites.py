@@ -84,6 +84,28 @@ def test_cloud_read_failure_falls_back_to_local(monkeypatch):
     assert any(f["symbol"] == "LOCAL1" for f in favs)
 
 
+def test_check_connection_local_mode():
+    status = fav.check_connection()
+    assert status["mode"] == "local"
+    assert status["ok"] is None
+
+
+def test_check_connection_cloud_ok(monkeypatch):
+    fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
+    monkeypatch.setattr(fav, "_sb_read", lambda cfg: [{"symbol": "TCS", "exchange": "NSE"}])
+    status = fav.check_connection()
+    assert status["mode"] == "cloud" and status["ok"] is True
+
+
+def test_check_connection_cloud_error(monkeypatch):
+    fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
+    monkeypatch.setattr(fav, "_sb_read",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("401 unauthorized")))
+    status = fav.check_connection()
+    assert status["mode"] == "cloud" and status["ok"] is False
+    assert "401" in status["message"]
+
+
 def test_cloud_add_failure_falls_back_to_local(monkeypatch):
     fav.configure(supabase_url="https://x.supabase.co", supabase_key="key123")
     monkeypatch.setattr(fav, "_sb_add",

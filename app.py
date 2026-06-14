@@ -184,6 +184,14 @@ _mode = favourites_mod.storage_mode()
 st.sidebar.markdown(f"### ⭐ Favourites &nbsp; <span style='font-size:0.7rem;opacity:0.6'>"
                     f"({'☁ cloud' if _mode == 'cloud' else 'local'})</span>",
                     unsafe_allow_html=True)
+
+if _mode == "cloud":
+    if st.sidebar.button("🔌 Test cloud connection", use_container_width=True):
+        st.session_state["_cloud_status"] = favourites_mod.check_connection()
+    _status = st.session_state.get("_cloud_status")
+    if _status:
+        (st.sidebar.success if _status["ok"] else st.sidebar.error)(_status["message"])
+
 favs = favourites_mod.load_favourites(exchange)
 if not favs:
     st.sidebar.caption(f"No saved {exchange} stocks yet. Use the ⭐ button on a stock.")
