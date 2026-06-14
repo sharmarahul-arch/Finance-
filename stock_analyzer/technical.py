@@ -45,6 +45,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     if {"High", "Low"}.issubset(out.columns):
         out["ADX"] = ind.adx(out["High"], out["Low"], close, config.ADX_PERIOD)
+        out["ATR"] = ind.atr(out["High"], out["Low"], close, config.ADX_PERIOD)
 
     if "Volume" in out.columns:
         out["VOL_AVG"] = out["Volume"].rolling(config.VOLUME_LOOKBACK, min_periods=1).mean()

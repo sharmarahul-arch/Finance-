@@ -49,6 +49,11 @@ class FundamentalThresholds:
     revenue_growth_good: float = 0.10
     earnings_growth_good: float = 0.10
     dividend_yield_good: float = 0.02
+    # From the playbook guide:
+    current_ratio_good: float = 1.5      # >1.5 is comfortable
+    debt_ebitda_good: float = 3.0        # <=3x manageable
+    debt_ebitda_high: float = 4.0        # >4x risky
+    payout_ratio_high: float = 0.80      # >80% may be unsustainable
 
 
 FUNDAMENTAL_THRESHOLDS = FundamentalThresholds()

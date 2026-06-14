@@ -178,6 +178,68 @@ def evaluate(info: dict) -> FundamentalResult:
         signals.append(Signal("Dividend yield", "fundamental", "neutral", 50,
                               f"Dividend yield {dy*100:.1f}%."))
 
+    # --- Liquidity: current ratio (guide: >1.5 is comfortable) -------------- #
+    cr = _get(info, "currentRatio")
+    metrics["Current ratio"] = cr
+    if cr is None:
+        signals.append(Signal("Current ratio", "fundamental", "n/a", 50, "Current ratio unavailable."))
+    elif cr >= T.current_ratio_good:
+        signals.append(Signal("Current ratio", "fundamental", "bullish", 65,
+                              f"Current ratio {cr:.2f} — comfortable liquidity."))
+    elif cr >= 1.0:
+        signals.append(Signal("Current ratio", "fundamental", "neutral", 48,
+                              f"Current ratio {cr:.2f} — adequate."))
+    else:
+        signals.append(Signal("Current ratio", "fundamental", "bearish", 30,
+                              f"Current ratio {cr:.2f} — short-term liquidity strain."))
+
+    # --- Leverage: Debt/EBITDA (guide: above ~4x is risky) ------------------ #
+    total_debt = _get(info, "totalDebt")
+    ebitda = _get(info, "ebitda")
+    debt_ebitda = (total_debt / ebitda) if (total_debt is not None and ebitda and ebitda > 0) else None
+    metrics["Debt/EBITDA"] = debt_ebitda
+    if debt_ebitda is None:
+        signals.append(Signal("Debt/EBITDA", "fundamental", "n/a", 50, "Debt/EBITDA unavailable."))
+    elif debt_ebitda <= T.debt_ebitda_good:
+        signals.append(Signal("Debt/EBITDA", "fundamental", "bullish", 66,
+                              f"Debt/EBITDA {debt_ebitda:.1f}x — manageable leverage."))
+    elif debt_ebitda <= T.debt_ebitda_high:
+        signals.append(Signal("Debt/EBITDA", "fundamental", "neutral", 45,
+                              f"Debt/EBITDA {debt_ebitda:.1f}x — watch leverage."))
+    else:
+        signals.append(Signal("Debt/EBITDA", "fundamental", "bearish", 28,
+                              f"Debt/EBITDA {debt_ebitda:.1f}x — high leverage risk."))
+
+    # --- Cash quality: free cash flow (guide: FCF funds growth; the hardest
+    #     statement to fake) -------------------------------------------------- #
+    fcf = _get(info, "freeCashflow")
+    metrics["Free cash flow"] = fcf
+    if fcf is None:
+        signals.append(Signal("Free cash flow", "fundamental", "n/a", 50, "Free cash flow unavailable."))
+    elif fcf > 0:
+        signals.append(Signal("Free cash flow", "fundamental", "bullish", 68,
+                              "Positive free cash flow — self-funding business."))
+    else:
+        signals.append(Signal("Free cash flow", "fundamental", "bearish", 32,
+                              "Negative free cash flow — burning cash."))
+
+    # --- Dividend safety: payout ratio (guide: above ~80% may be unsustainable) #
+    payout = _get(info, "payoutRatio")
+    if payout is not None and payout > 1.5:   # occasionally reported as a percent
+        payout = payout / 100.0
+    metrics["Payout ratio"] = payout
+    if payout is None:
+        signals.append(Signal("Payout ratio", "fundamental", "n/a", 50, "Payout ratio unavailable."))
+    elif payout <= 0:
+        signals.append(Signal("Payout ratio", "fundamental", "neutral", 50,
+                              "No/again negative payout ratio."))
+    elif payout <= T.payout_ratio_high:
+        signals.append(Signal("Payout ratio", "fundamental", "bullish", 60,
+                              f"Payout ratio {payout*100:.0f}% — dividend looks sustainable."))
+    else:
+        signals.append(Signal("Payout ratio", "fundamental", "bearish", 35,
+                              f"Payout ratio {payout*100:.0f}% — may be unsustainable."))
+
     metrics["Market cap"] = _get(info, "marketCap")
 
     score = _aggregate(signals)

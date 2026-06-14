@@ -17,6 +17,7 @@ from stock_analyzer.backtest import run_backtest
 from stock_analyzer.config import HORIZONS
 from stock_analyzer.data import DataError
 from stock_analyzer.engine import analyze_stock
+from stock_analyzer.risk import compute_risk_plan
 
 st.set_page_config(page_title="Stock Analyzer — India", page_icon="📈", layout="wide")
 
@@ -64,10 +65,13 @@ def _fmt_money(value, currency="INR"):
 def _fmt_metric(name, value):
     if value is None:
         return "N/A"
-    if name in {"ROE", "Net margin", "Revenue growth", "Earnings growth", "Dividend yield"}:
+    if name in {"ROE", "Net margin", "Revenue growth", "Earnings growth",
+                "Dividend yield", "Payout ratio"}:
         return f"{value * 100:.1f}%"
-    if name == "Market cap":
+    if name in {"Market cap", "Free cash flow"}:
         return f"₹{value/1e7:,.0f} Cr"  # 1 crore = 1e7
+    if name == "Debt/EBITDA":
+        return f"{value:.1f}x"
     return f"{value:,.2f}"
 
 
@@ -356,8 +360,59 @@ else:
         "performance does not guarantee future results."
     )
 
+# --- Risk management (from the playbook) ------------------------------------ #
+st.markdown("### 🛡️ Risk management")
+st.caption(
+    "The playbook's most important step: decide **how much** to buy and **where "
+    "you're wrong** before entering. Position sized on the 1–2% risk-per-trade rule."
+)
+rc1, rc2, rc3 = st.columns(3)
+account_size = rc1.number_input("Your capital (₹)", min_value=0, value=100000, step=10000)
+risk_pct = rc2.slider("Risk per trade (%)", 0.5, 5.0, 1.0, step=0.5,
+                      help="Playbook suggests 1–2%.")
+atr_mult = rc3.slider("Stop distance (× ATR)", 1.0, 4.0, 2.0, step=0.5)
+
+plan = compute_risk_plan(report.price_df, account_size, risk_pct=risk_pct, atr_mult=atr_mult)
+if not plan.ok:
+    st.info(plan.message)
+else:
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Entry (last close)", _fmt_money(plan.entry))
+    p2.metric("Stop-loss", _fmt_money(plan.stop_loss), delta=f"-{plan.stop_pct:.1f}%")
+    p3.metric("Target", _fmt_money(plan.target))
+    rr_txt = f"{plan.risk_reward:.2f} : 1" if plan.risk_reward is not None else "—"
+    p4.metric("Risk / reward", rr_txt)
+    q1, q2, q3 = st.columns(3)
+    q1.metric("Suggested size", f"{plan.shares:,} shares")
+    q2.metric("Position value", _fmt_money(plan.position_value))
+    q3.metric("Capital at risk", _fmt_money(plan.capital_at_risk))
+    if plan.capped_by_capital:
+        st.caption("⚠️ Position limited by available capital (the full risk-based size "
+                   "would exceed your stated capital).")
+    if plan.risk_reward is not None and plan.risk_reward < 1.5:
+        st.warning("Risk/reward is below ~1.5 — the playbook favours setups where the "
+                   "potential reward meaningfully exceeds the risk.")
+
+# --- Workflow checklist (the guide's coherent workflow) --------------------- #
+with st.expander("📋 The workflow checklist (what → when → how much)"):
+    st.markdown(
+        "1. **Screen** — fundamentally sound: good returns, sane valuation, strong "
+        "balance sheet, a durable moat.\n"
+        "2. **Build a thesis** — *why* is it mispriced, what's the catalyst, and what "
+        "would prove you wrong?\n"
+        "3. **Time the entry** — technicals: buy near support in an uptrend, or a "
+        "confirmed breakout (volume confirms).\n"
+        "4. **Define risk first** — position size, stop-loss and the thesis-breaking "
+        "news that forces an exit — *before* entering.\n"
+        "5. **Monitor & review** — periodically, not obsessively. Keep a journal.\n\n"
+        "> **Fundamentals decide _what_, technicals decide _when_, risk management "
+        "decides _how much_** — the part that keeps an account solvent. "
+        "See the **Playbook** page for the full guide."
+    )
+
 st.markdown("---")
 st.caption(
-    "Educational tool — not financial advice. Data via Yahoo Finance (yfinance), "
-    "which may be delayed or incomplete."
+    "Educational tool — **not financial advice**. No system is foolproof; markets are "
+    "partly random, and behaviour (fear, greed, revenge-trading) destroys more accounts "
+    "than bad analysis. Data via Yahoo Finance (yfinance), which may be delayed or incomplete."
 )

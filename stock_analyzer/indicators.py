@@ -50,6 +50,16 @@ def bollinger_bands(series: pd.Series, period: int = 20, num_std: float = 2.0):
     return middle, upper, lower
 
 
+def atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+    """Average True Range (volatility), Wilder-smoothed."""
+    prev_close = close.shift(1)
+    tr = pd.concat(
+        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()],
+        axis=1,
+    ).max(axis=1)
+    return tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+
+
 def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     """Average Directional Index (trend strength)."""
     up_move = high.diff()

@@ -40,6 +40,10 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
   column. Favourites are stored locally by default (a JSON file; path overridable
   with `STOCK_FAV_PATH`) and can optionally use a **durable cloud store** that
   survives redeploys and syncs across devices — see "Durable favourites" below.
+- **Risk management (playbook-driven)** — position sizing from the 1–2%
+  risk-per-trade rule, an ATR-based stop-loss, a target from recent structure,
+  and the resulting risk/reward — so you decide *how much* and *where you're
+  wrong* before entering. Plus an in-app **Playbook** page with the full guide.
 - **News sentiment** — recent headlines are scored with a finance lexicon and
   folded into the composite (a small, horizon-dependent weight). Headlines are
   shown with their polarity on the single-stock page.
@@ -89,7 +93,8 @@ Tests run fully offline using synthetic data (no network calls).
 Finance-/
 ├── app.py                     # Streamlit UI — single-stock page (home)
 ├── pages/
-│   └── 1_Screener.py          # Streamlit UI — multi-stock screener page
+│   ├── 1_Screener.py          # Streamlit UI — multi-stock screener page
+│   └── 2_Playbook.py          # Streamlit UI — the analysis guide / framework
 ├── stock_analyzer/            # pure-Python analysis library (UI-free, testable)
 │   ├── config.py              # indicator params, thresholds, horizon profiles, verdict bands
 │   ├── data.py                # yfinance fetching + ticker normalization
@@ -99,6 +104,7 @@ Finance-/
 │   ├── recommendation.py      # horizon-weighted verdict + ranked reasons (incl. news)
 │   ├── screener.py            # parallel multi-stock ranking
 │   ├── sentiment.py           # finance-lexicon news sentiment (offline)
+│   ├── risk.py                # position sizing, stop-loss, risk/reward (playbook)
 │   ├── backtest.py            # backtest the technical signals vs buy-and-hold
 │   ├── engine.py              # orchestration: ticker -> data -> analysis -> verdict
 │   └── models.py              # shared Signal dataclass

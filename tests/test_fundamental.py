@@ -47,6 +47,42 @@ def test_company_meta_handles_missing_prev_close():
     assert meta["change_pct"] is None
 
 
+def test_guide_signals_present_and_scored():
+    info = {
+        "currentRatio": 2.0,        # comfortable
+        "totalDebt": 100.0, "ebitda": 50.0,   # Debt/EBITDA = 2.0x
+        "freeCashflow": 5000.0,     # positive
+        "payoutRatio": 0.40,        # sustainable
+    }
+    res = evaluate(info)
+    names = {s.name: s for s in res.signals}
+    assert names["Current ratio"].status == "bullish"
+    assert names["Debt/EBITDA"].status == "bullish"
+    assert names["Free cash flow"].status == "bullish"
+    assert names["Payout ratio"].status == "bullish"
+    assert abs(res.metrics["Debt/EBITDA"] - 2.0) < 1e-9
+
+
+def test_guide_signals_flag_weak_fundamentals():
+    info = {
+        "currentRatio": 0.8,                 # liquidity strain
+        "totalDebt": 500.0, "ebitda": 50.0,  # 10x -> high leverage
+        "freeCashflow": -2000.0,             # burning cash
+        "payoutRatio": 0.95,                 # unsustainable
+    }
+    res = evaluate(info)
+    names = {s.name: s for s in res.signals}
+    assert names["Current ratio"].status == "bearish"
+    assert names["Debt/EBITDA"].status == "bearish"
+    assert names["Free cash flow"].status == "bearish"
+    assert names["Payout ratio"].status == "bearish"
+
+
+def test_payout_ratio_percent_normalized():
+    res = evaluate({"payoutRatio": 40.0})   # given as percent
+    assert abs(res.metrics["Payout ratio"] - 0.40) < 1e-9
+
+
 def test_missing_metric_is_na_not_zero(strong_fundamentals):
     info = dict(strong_fundamentals)
     info.pop("returnOnEquity")

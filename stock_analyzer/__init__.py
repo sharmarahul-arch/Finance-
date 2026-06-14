@@ -10,6 +10,7 @@ from .fundamental import FundamentalResult, analyze_fundamental
 from .screener import ScreenResult, ScreenSummary, screen
 from .backtest import BacktestResult, run_backtest
 from .sentiment import SentimentResult, analyze_news, score_headline
+from .risk import RiskPlan, compute_risk_plan
 from .config import HORIZONS
 
 __all__ = [
@@ -27,5 +28,7 @@ __all__ = [
     "SentimentResult",
     "analyze_news",
     "score_headline",
+    "RiskPlan",
+    "compute_risk_plan",
     "HORIZONS",
 ]
