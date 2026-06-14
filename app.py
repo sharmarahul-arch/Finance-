@@ -11,6 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from stock_analyzer import data as data_mod
+from stock_analyzer import favourites as favourites_mod
 from stock_analyzer import universe as universe_mod
 from stock_analyzer.backtest import run_backtest
 from stock_analyzer.config import HORIZONS
@@ -127,12 +128,23 @@ def gauge(score: float, color: str):
 st.sidebar.title("📈 Stock Analyzer")
 st.sidebar.caption("Technical + fundamental analysis for Indian stocks")
 
-exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
+
+def _select_stock(sym: str, exch: str):
+    """Callback used by the favourites list to jump to a saved stock."""
+    st.session_state["exchange"] = exch
+    st.session_state["symbol"] = sym
+
+
+exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0, key="exchange")
 
 universe = _load_universe(exchange)
 options = [r["symbol"] for r in universe]
 labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
 default_idx = options.index("RELIANCE") if "RELIANCE" in options else 0
+
+# Keep the persisted picker value valid when the exchange changes.
+if st.session_state.get("symbol") not in options:
+    st.session_state.pop("symbol", None)
 
 symbol = st.sidebar.selectbox(
     f"🔍 Search a stock ({exchange})",
@@ -140,6 +152,7 @@ symbol = st.sidebar.selectbox(
     index=default_idx,
     format_func=lambda s: labels.get(s, s),
     help="Type a company name or symbol, e.g. Reliance, Infosys, HDFC…",
+    key="symbol",
 )
 horizon_label = st.sidebar.radio(
     "Investment horizon",
@@ -147,6 +160,22 @@ horizon_label = st.sidebar.radio(
 )
 horizon = "short_term" if horizon_label == HORIZONS["short_term"].label else "long_term"
 st.sidebar.caption(HORIZONS[horizon].description)
+
+# --- Favourites quick-load -------------------------------------------------- #
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⭐ Favourites")
+favs = favourites_mod.load_favourites(exchange)
+if not favs:
+    st.sidebar.caption(f"No saved {exchange} stocks yet. Use the ⭐ button on a stock.")
+else:
+    for f in favs:
+        st.sidebar.button(
+            f"⭐ {labels.get(f['symbol'], f.get('name') or f['symbol'])}",
+            key=f"fav_{exchange}_{f['symbol']}",
+            on_click=_select_stock,
+            args=(f["symbol"], exchange),
+            use_container_width=True,
+        )
 
 st.sidebar.markdown("---")
 st.sidebar.warning(
@@ -178,9 +207,21 @@ meta = report.meta
 rec = report.recommendation
 
 # --- Header ----------------------------------------------------------------- #
-st.subheader(f"{meta['name']}  ·  `{meta['ticker']}`")
+title_col, star_col = st.columns([5, 1])
+title_col.subheader(f"{meta['name']}  ·  `{meta['ticker']}`")
+saved = favourites_mod.is_favourite(symbol, exchange)
+if star_col.button("★ Saved" if saved else "☆ Save", use_container_width=True,
+                   help="Add/remove from your favourites"):
+    favourites_mod.toggle_favourite(symbol, exchange, meta["name"])
+    st.rerun()
+
+# Live price with a red/green day-change delta (st.metric colours it automatically).
+day_delta = None
+if meta.get("change_pct") is not None:
+    day_delta = f"{meta['change']:+,.2f} ({meta['change_pct']:+.2f}%)"
+
 c1, c2, c3 = st.columns(3)
-c1.metric("Current price", _fmt_money(meta["price"], meta["currency"]))
+c1.metric("Live price", _fmt_money(meta["price"], meta["currency"]), delta=day_delta)
 c2.metric("Sector", meta["sector"])
 c3.metric("Horizon", HORIZONS[horizon].label)
 

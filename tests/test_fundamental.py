@@ -29,6 +29,24 @@ def test_dividend_yield_percentage_normalized():
     assert abs(res.metrics["Dividend yield"] - 0.025) < 1e-9
 
 
+def test_company_meta_computes_day_change():
+    from stock_analyzer.data import get_company_meta
+    meta = get_company_meta("TEST.NS", {
+        "longName": "Test Co", "currentPrice": 110.0,
+        "regularMarketPreviousClose": 100.0, "currency": "INR",
+    })
+    assert meta["price"] == 110.0
+    assert meta["change"] == 10.0
+    assert abs(meta["change_pct"] - 10.0) < 1e-9
+
+
+def test_company_meta_handles_missing_prev_close():
+    from stock_analyzer.data import get_company_meta
+    meta = get_company_meta("TEST.NS", {"longName": "Test Co", "currentPrice": 50.0})
+    assert meta["price"] == 50.0
+    assert meta["change_pct"] is None
+
+
 def test_missing_metric_is_na_not_zero(strong_fundamentals):
     info = dict(strong_fundamentals)
     info.pop("returnOnEquity")

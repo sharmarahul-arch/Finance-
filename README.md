@@ -33,6 +33,11 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
   **NSE and BSE** — pick the exchange and the picker loads that market's stocks
   (full live lists when online; a bundled list of popular dual-listed names as an
   offline fallback). The screener uses the same picker to build a watchlist.
+- **Trading-screen header** — live price with a red/green **day-change %** badge.
+- **Favourites / watchlist** — ⭐ save stocks and they persist across sessions;
+  quick-load them from the sidebar, or add all your favourites to the screener
+  watchlist in one click. (Stored in a JSON file; override the path with the
+  `STOCK_FAV_PATH` env var.)
 - **News sentiment** — recent headlines are scored with a finance lexicon and
   folded into the composite (a small, horizon-dependent weight). Headlines are
   shown with their polarity on the single-stock page.

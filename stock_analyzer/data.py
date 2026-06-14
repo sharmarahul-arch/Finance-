@@ -128,11 +128,21 @@ def get_company_meta(ticker: str, info: Optional[dict] = None) -> dict:
         or info.get("regularMarketPrice")
         or info.get("previousClose")
     )
+    prev_close = info.get("regularMarketPreviousClose") or info.get("previousClose")
+
+    change = change_pct = None
+    if price is not None and prev_close:
+        change = price - prev_close
+        change_pct = (change / prev_close * 100.0) if prev_close else None
+
     return {
         "name": info.get("longName") or info.get("shortName") or ticker,
         "sector": info.get("sector") or "—",
         "industry": info.get("industry") or "—",
         "price": price,
+        "previous_close": prev_close,
+        "change": change,
+        "change_pct": change_pct,
         "currency": info.get("currency") or "INR",
         "ticker": ticker,
     }

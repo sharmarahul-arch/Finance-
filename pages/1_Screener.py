@@ -11,6 +11,7 @@ import plotly.express as px
 import streamlit as st
 
 from stock_analyzer.config import HORIZONS
+from stock_analyzer import favourites as favourites_mod
 from stock_analyzer import universe as universe_mod
 from stock_analyzer.screener import screen
 
@@ -50,20 +51,44 @@ def _fmt_money(value, currency="INR"):
 st.sidebar.title("📊 Screener")
 st.sidebar.caption("Rank a watchlist by Buy/Sell score")
 
-exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
+exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0, key="scr_exchange")
 
 universe = _load_universe(exchange)
 all_symbols = [r["symbol"] for r in universe]
 labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
 defaults = [s for s in DEFAULT_WATCHLIST if s in all_symbols]
 
+fav_symbols = [
+    f["symbol"] for f in favourites_mod.load_favourites(exchange)
+    if f["symbol"] in all_symbols
+]
+
+
+def _load_favourites_into_watchlist():
+    current = st.session_state.get("scr_watchlist", [])
+    merged = list(dict.fromkeys(current + fav_symbols))  # de-dupe, keep order
+    # Drop any stale values not in the current option set.
+    st.session_state["scr_watchlist"] = [s for s in merged if s in all_symbols]
+
+
+# Keep persisted selection valid when the exchange changes.
+st.session_state["scr_watchlist"] = [
+    s for s in st.session_state.get("scr_watchlist", defaults) if s in all_symbols
+]
+
 selected = st.sidebar.multiselect(
     f"🔍 Build your watchlist ({exchange})",
     options=all_symbols,
-    default=defaults,
     format_func=lambda s: labels.get(s, s),
     help=f"Search and add stocks by name or symbol. Up to {MAX_TICKERS}.",
+    key="scr_watchlist",
 )
+if fav_symbols:
+    st.sidebar.button(
+        f"⭐ Add my {exchange} favourites ({len(fav_symbols)})",
+        on_click=_load_favourites_into_watchlist,
+        use_container_width=True,
+    )
 horizon_label = st.sidebar.radio(
     "Investment horizon",
     options=[HORIZONS["short_term"].label, HORIZONS["long_term"].label],
