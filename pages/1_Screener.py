@@ -143,7 +143,10 @@ def _style_verdict(val):
     color = color_map.get(val)
     return f"background-color: {color}; color: white;" if color else ""
 
-styled = df.style.applymap(_style_verdict, subset=["Verdict"]).format(
+# pandas >=2.1 renamed Styler.applymap -> Styler.map (applymap removed in 3.0).
+_style = df.style
+_elementwise = getattr(_style, "map", None) or _style.applymap
+styled = _elementwise(_style_verdict, subset=["Verdict"]).format(
     {"Score": "{:.1f}", "Technical": "{:.1f}", "Fundamental": "{:.1f}"}
 )
 
