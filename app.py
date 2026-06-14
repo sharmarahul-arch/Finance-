@@ -11,6 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from stock_analyzer import data as data_mod
+from stock_analyzer import universe as universe_mod
 from stock_analyzer.backtest import run_backtest
 from stock_analyzer.config import HORIZONS
 from stock_analyzer.data import DataError
@@ -25,6 +26,11 @@ st.set_page_config(page_title="Stock Analyzer — India", page_icon="📈", layo
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_analyze(symbol: str, exchange: str, horizon: str):
     return analyze_stock(symbol, exchange=exchange, horizon=horizon, include_news=True)
+
+
+@st.cache_data(ttl=86400, show_spinner="Loading stock list…")
+def _load_universe():
+    return universe_mod.load_universe()
 
 
 def _fmt_money(value, currency="INR"):
@@ -121,8 +127,18 @@ def gauge(score: float, color: str):
 st.sidebar.title("📈 Stock Analyzer")
 st.sidebar.caption("Technical + fundamental analysis for Indian stocks")
 
-symbol = st.sidebar.text_input("Ticker symbol", value="RELIANCE",
-                               help="e.g. RELIANCE, TCS, INFY, HDFCBANK").strip()
+universe = _load_universe()
+options = [r["symbol"] for r in universe]
+labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
+default_idx = options.index("RELIANCE") if "RELIANCE" in options else 0
+
+symbol = st.sidebar.selectbox(
+    "🔍 Search a stock",
+    options=options,
+    index=default_idx,
+    format_func=lambda s: labels.get(s, s),
+    help="Type a company name or symbol, e.g. Reliance, Infosys, HDFC…",
+)
 exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
 horizon_label = st.sidebar.radio(
     "Investment horizon",
@@ -130,7 +146,6 @@ horizon_label = st.sidebar.radio(
 )
 horizon = "short_term" if horizon_label == HORIZONS["short_term"].label else "long_term"
 st.sidebar.caption(HORIZONS[horizon].description)
-analyze_clicked = st.sidebar.button("Analyze", type="primary", use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.warning(
@@ -144,12 +159,8 @@ st.sidebar.warning(
 # --------------------------------------------------------------------------- #
 st.title("Stock Analysis & Investment Suggestion")
 
-if not analyze_clicked:
-    st.info("Enter a ticker in the sidebar, choose a horizon, and click **Analyze**.")
-    st.stop()
-
 if not symbol:
-    st.error("Please enter a ticker symbol.")
+    st.info("🔍 Search and select a stock from the sidebar to begin.")
     st.stop()
 
 try:

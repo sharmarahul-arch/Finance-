@@ -6,20 +6,20 @@ main single-stock app (``app.py``) remains the home page.
 
 from __future__ import annotations
 
-import re
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
 from stock_analyzer.config import HORIZONS
+from stock_analyzer import universe as universe_mod
 from stock_analyzer.screener import screen
 
 st.set_page_config(page_title="Screener — Stock Analyzer", page_icon="📊", layout="wide")
 
-DEFAULT_WATCHLIST = (
-    "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, ITC, LT, HINDUNILVR, BHARTIARTL"
-)
+DEFAULT_WATCHLIST = [
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
+    "SBIN", "ITC", "LT", "HINDUNILVR", "BHARTIARTL",
+]
 MAX_TICKERS = 30
 
 
@@ -29,10 +29,9 @@ def _cached_screen(symbols: tuple, exchange: str, horizon: str):
     return screen(list(symbols), exchange=exchange, horizon=horizon)
 
 
-def _parse_symbols(raw: str):
-    """Split on commas / whitespace / newlines into a clean symbol list."""
-    parts = re.split(r"[\s,]+", raw.strip())
-    return [p for p in parts if p]
+@st.cache_data(ttl=86400, show_spinner="Loading stock list…")
+def _load_universe():
+    return universe_mod.load_universe()
 
 
 def _fmt_money(value, currency="INR"):
@@ -51,12 +50,17 @@ def _fmt_money(value, currency="INR"):
 st.sidebar.title("📊 Screener")
 st.sidebar.caption("Rank a watchlist by Buy/Sell score")
 
-raw_symbols = st.sidebar.text_area(
-    "Tickers",
-    value=DEFAULT_WATCHLIST,
-    height=120,
-    help="Separate with commas, spaces or new lines. Up to "
-         f"{MAX_TICKERS} symbols.",
+universe = _load_universe()
+all_symbols = [r["symbol"] for r in universe]
+labels = {r["symbol"]: f"{r['name']} ({r['symbol']})" for r in universe}
+defaults = [s for s in DEFAULT_WATCHLIST if s in all_symbols]
+
+selected = st.sidebar.multiselect(
+    "🔍 Build your watchlist",
+    options=all_symbols,
+    default=defaults,
+    format_func=lambda s: labels.get(s, s),
+    help=f"Search and add stocks by name or symbol. Up to {MAX_TICKERS}.",
 )
 exchange = st.sidebar.selectbox("Exchange", ["NSE", "BSE"], index=0)
 horizon_label = st.sidebar.radio(
@@ -84,12 +88,12 @@ st.caption(
 )
 
 if not run:
-    st.info("Enter a watchlist in the sidebar, choose a horizon, and click **Run screener**.")
+    st.info("Build a watchlist in the sidebar, choose a horizon, and click **Run screener**.")
     st.stop()
 
-symbols = _parse_symbols(raw_symbols)
+symbols = list(selected)
 if not symbols:
-    st.error("Please enter at least one ticker.")
+    st.error("Please add at least one stock to your watchlist.")
     st.stop()
 if len(symbols) > MAX_TICKERS:
     st.warning(f"Limiting to the first {MAX_TICKERS} tickers (you entered {len(symbols)}).")
