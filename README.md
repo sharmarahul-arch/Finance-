@@ -11,6 +11,11 @@ to your **investment horizon** — short term (trading) or long term (investing)
 
 ## What it does
 
+Every analysis opens with a plain-language **"Should you buy?" → YES / WAIT / NO**
+answer, computed automatically from the scores — no manual input required (the
+risk and backtest tools run on sensible defaults, with optional adjusters tucked
+into expanders).
+
 For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
 
 - **Technical analysis** — trend (SMA 20/50/200, golden/death cross), momentum

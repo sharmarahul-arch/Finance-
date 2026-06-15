@@ -62,6 +62,16 @@ def _fmt_money(value, currency="INR"):
         return str(value)
 
 
+def _buy_call(verdict: str):
+    """Map the verdict to a plain-language 'should I buy?' answer + colour."""
+    v = (verdict or "").lower()
+    if "buy" in v:
+        return "✅", "YES", "looks like a buy", "#1a7e2e"
+    if "sell" in v:
+        return "❌", "NO", "not a buy right now — consider avoiding/selling", "#c62828"
+    return "🟡", "WAIT", "no clear edge yet — better to hold/watch", "#f0ad4e"
+
+
 def _fmt_metric(name, value):
     if value is None:
         return "N/A"
@@ -266,6 +276,21 @@ st.caption(
     "slightly from your broker's real-time feed. Use 🔄 Refresh for the latest."
 )
 
+# --- Plain-language "Should I buy?" answer (automatic, no input needed) ------ #
+_emoji, _answer, _sub, _bcolor = _buy_call(rec.verdict)
+st.markdown(
+    f"<div style='padding:1.1rem 1.4rem;border-radius:14px;background:{_bcolor};"
+    f"color:white;margin:0.4rem 0'>"
+    f"<div style='font-size:1.0rem;opacity:0.92'>Should you buy {meta['name']}? "
+    f"({HORIZONS[horizon].label})</div>"
+    f"<div style='font-size:2.2rem;font-weight:800'>{_emoji} {_answer} &nbsp;"
+    f"<span style='font-size:1.0rem;font-weight:500;opacity:0.95'>— {_sub}</span></div>"
+    f"<div style='font-size:0.9rem;opacity:0.92'>Verdict: {rec.verdict} · "
+    f"Score {rec.composite_score}/100 · Confidence {rec.confidence:.0f}%</div>"
+    f"</div>",
+    unsafe_allow_html=True,
+)
+
 # --- Verdict + gauge -------------------------------------------------------- #
 v1, v2 = st.columns([1, 1])
 with v1:
@@ -336,9 +361,11 @@ st.caption(
     "How a long-only strategy that buys on a strong technical score and exits when "
     "it weakens would have performed on this price history — vs simply buying & holding."
 )
-bc1, bc2 = st.columns(2)
-buy_th = bc1.slider("Buy when score ≥", 50, 90, 60, step=5)
-exit_th = bc2.slider("Exit when score ≤", 10, 50, 45, step=5)
+buy_th, exit_th = 60, 45   # sensible defaults — no input required
+with st.expander("⚙️ Adjust backtest thresholds (optional)"):
+    bc1, bc2 = st.columns(2)
+    buy_th = bc1.slider("Buy when score ≥", 50, 90, 60, step=5)
+    exit_th = bc2.slider("Exit when score ≤", 10, 50, 45, step=5)
 
 bt = run_backtest(report.price_df, buy_threshold=buy_th, exit_threshold=exit_th)
 if not bt.ok:
@@ -372,14 +399,18 @@ else:
 # --- Risk management (from the playbook) ------------------------------------ #
 st.markdown("### 🛡️ Risk management")
 st.caption(
-    "The playbook's most important step: decide **how much** to buy and **where "
-    "you're wrong** before entering. Position sized on the 1–2% risk-per-trade rule."
+    "Auto-computed stop-loss, target and risk/reward using sensible defaults "
+    "(₹1,00,000 capital · 1% risk per trade · 2× ATR stop). No input needed — "
+    "expand below only if you want to tailor it."
 )
-rc1, rc2, rc3 = st.columns(3)
-account_size = rc1.number_input("Your capital (₹)", min_value=0, value=100000, step=10000)
-risk_pct = rc2.slider("Risk per trade (%)", 0.5, 5.0, 1.0, step=0.5,
-                      help="Playbook suggests 1–2%.")
-atr_mult = rc3.slider("Stop distance (× ATR)", 1.0, 4.0, 2.0, step=0.5)
+# Sensible defaults so the plan is fully automatic; the inputs are optional.
+account_size, risk_pct, atr_mult = 100000, 1.0, 2.0
+with st.expander("⚙️ Adjust position-sizing assumptions (optional)"):
+    rc1, rc2, rc3 = st.columns(3)
+    account_size = rc1.number_input("Your capital (₹)", min_value=0, value=100000, step=10000)
+    risk_pct = rc2.slider("Risk per trade (%)", 0.5, 5.0, 1.0, step=0.5,
+                          help="Playbook suggests 1–2%.")
+    atr_mult = rc3.slider("Stop distance (× ATR)", 1.0, 4.0, 2.0, step=0.5)
 
 plan = compute_risk_plan(report.price_df, account_size, risk_pct=risk_pct, atr_mult=atr_mult)
 if not plan.ok:
