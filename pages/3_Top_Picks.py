@@ -20,11 +20,6 @@ BUY_VERDICTS = {"Buy", "Strong Buy"}
 CAP_ORDER = ["Large", "Mid", "Small"]
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def _cached_scan(symbols: tuple, exchange: str, horizon: str):
-    return screen(list(symbols), exchange=exchange, horizon=horizon, max_workers=8)
-
-
 def _fmt_money(value, currency="INR"):
     if value is None:
         return "—"
@@ -102,14 +97,34 @@ st.caption(
     "and sector below."
 )
 
-if not run:
-    st.info("Pick an exchange, horizon and scan size in the sidebar, then click "
-            "**Find top picks**.")
+symbols = [r["symbol"] for r in pool][:scan_n]
+
+# Run a fresh scan on button click (with a live progress bar), then keep the
+# results in session state so changing the filters below does NOT re-fetch.
+if run:
+    prog = st.progress(0.0, text=f"Scanning 0/{len(symbols)} stocks…")
+
+    def _on_progress(done, total):
+        frac = (done / total) if total else 1.0
+        prog.progress(frac, text=f"Scanned {done}/{total} stocks…")
+
+    summary = screen(symbols, exchange=exchange, horizon=horizon,
+                     progress_callback=_on_progress)
+    prog.empty()
+    st.session_state["tp_summary"] = summary
+    st.session_state["tp_meta"] = {"exchange": exchange, "horizon": horizon,
+                                   "n": len(symbols)}
+
+if "tp_summary" not in st.session_state:
+    st.info("Choose sectors, exchange, horizon and scan size in the sidebar, then "
+            "click **Find top picks**.")
     st.stop()
 
-symbols = [r["symbol"] for r in pool][:scan_n]
-with st.spinner(f"Scanning {len(symbols)} stocks ({exchange}, {HORIZONS[horizon].label})…"):
-    summary = _cached_scan(tuple(symbols), exchange, horizon)
+summary = st.session_state["tp_summary"]
+_meta = st.session_state.get("tp_meta", {})
+st.caption(f"Last scan: {_meta.get('n', '?')} stocks · {_meta.get('exchange', exchange)} · "
+           f"{HORIZONS.get(_meta.get('horizon', horizon)).label}.  "
+           "Adjust filters below without re-scanning, or press **Find top picks** to rescan.")
 
 ok = summary.succeeded
 if not ok:

@@ -121,11 +121,14 @@ def screen(
     horizon: str = "long_term",
     max_workers: int = 8,
     analyze_fn: Callable = analyze_stock,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> ScreenSummary:
     """Analyse ``symbols`` in parallel and return a ranked summary.
 
     ``analyze_fn`` is injectable so tests can supply a network-free stub; it must
     have the signature ``analyze_fn(symbol, exchange=..., horizon=...)``.
+    ``progress_callback(completed, total)`` is invoked in the calling thread as each
+    stock finishes (safe for updating a Streamlit progress bar).
     """
     if horizon not in HORIZONS:
         raise ValueError(f"Unknown horizon '{horizon}'. Choose from {list(HORIZONS)}.")
@@ -140,7 +143,10 @@ def screen(
             clean.append(s.strip())
 
     results: List[ScreenResult] = []
+    total = len(clean)
     if not clean:
+        if progress_callback:
+            progress_callback(0, 0)
         return ScreenSummary(horizon=horizon, exchange=exchange, results=results)
 
     workers = max(1, min(max_workers, len(clean)))
@@ -149,7 +155,14 @@ def screen(
             pool.submit(_analyze_one, sym, exchange, horizon, analyze_fn): sym
             for sym in clean
         }
+        done = 0
         for fut in as_completed(futures):
             results.append(fut.result())
+            done += 1
+            if progress_callback:
+                try:
+                    progress_callback(done, total)
+                except Exception:
+                    pass
 
     return ScreenSummary(horizon=horizon, exchange=exchange, results=results)

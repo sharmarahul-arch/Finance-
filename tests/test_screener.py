@@ -92,6 +92,17 @@ def test_sector_and_cap_propagated():
     assert r.cap_category == "Large"   # 3e11 = ₹30,000 cr
 
 
+def test_progress_callback_reports_completion():
+    fn = make_fake_analyze({"AAA": 70, "BBB": 60, "CCC": 50})
+    calls = []
+    summary = screen(["AAA", "BBB", "CCC"], analyze_fn=fn,
+                     progress_callback=lambda done, total: calls.append((done, total)))
+    assert len(summary.succeeded) == 3
+    assert calls[-1] == (3, 3)               # final call reports all done
+    assert [c[0] for c in calls] == [1, 2, 3]  # monotonically increasing
+    assert all(c[1] == 3 for c in calls)       # total constant
+
+
 def test_cap_bucket_thresholds():
     from stock_analyzer.screener import cap_bucket
     assert cap_bucket(3e11) == "Large"      # ₹30,000 cr
