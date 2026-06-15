@@ -65,10 +65,23 @@ horizon_label = st.sidebar.radio(
 horizon = "short_term" if horizon_label == HORIZONS["short_term"].label else "long_term"
 st.sidebar.caption(HORIZONS[horizon].description)
 
-pool = universe_mod.curated_universe()
+full_pool = universe_mod.curated_universe()
+all_sectors = universe_mod.curated_sectors()
+
+scan_sectors = st.sidebar.multiselect(
+    "Sectors to scan",
+    options=all_sectors,
+    default=all_sectors,
+    help="Scan sector-wise — pick one or more sectors (default: all).",
+)
+# Candidate pool = stocks in the chosen sectors.
+pool = [r for r in full_pool if not scan_sectors or r.get("sector") in scan_sectors]
+st.sidebar.caption(f"{len(pool)} stocks in selected sector(s).")
+
+max_n = max(10, len(pool))
 scan_n = st.sidebar.slider(
-    "How many stocks to scan", min_value=10, max_value=len(pool),
-    value=min(40, len(pool)), step=10,
+    "How many stocks to scan", min_value=10, max_value=max_n,
+    value=min(60, max_n), step=10,
     help="More = broader search but slower (each stock is a live fetch).",
 )
 run = st.sidebar.button("🔍 Find top picks", type="primary", use_container_width=True)

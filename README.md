@@ -24,9 +24,11 @@ For any ticker you enter (e.g. `RELIANCE`, `TCS`, `INFY`):
 - **Output** — a colour-coded verdict + confidence, a 0–100 composite score gauge,
   the ranked bullish/bearish signals behind it, interactive price/RSI/MACD charts,
   and a fundamentals table.
-- **Top Picks (auto-discovery)** — scans a pool of liquid stocks and surfaces the
-  highest Buy-rated names automatically, with **market-cap (Large/Mid/Small)** and
-  **sector** filters. The top 3 are highlighted as cards; the rest in a ranked table.
+- **Top Picks (auto-discovery)** — scans a sector-tagged pool of ~270 liquid
+  stocks across 22 sectors and surfaces the highest Buy-rated names automatically.
+  Pick **which sectors to scan** (scan sector-wise), then filter results by
+  **market-cap (Large/Mid/Small)** and **sector**. Top 3 highlighted as cards;
+  the rest in a ranked table; each pick is clickable through to its full analysis.
 - **Multi-stock screener** — paste a watchlist and rank every stock by its
   horizon-weighted score in one go (parallelised), with a sortable table,
   score bar chart and CSV export. Available from the **Screener** page in the

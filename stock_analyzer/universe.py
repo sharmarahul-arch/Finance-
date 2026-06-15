@@ -23,6 +23,7 @@ BSE_EQUITY_URL = (
     "?Group=&Scripcode=&industry=&segment=Equity&status=Active"
 )
 _BUNDLED = os.path.join(os.path.dirname(__file__), "..", "data", "nse_equities.csv")
+_BUNDLED_SECTORS = os.path.join(os.path.dirname(__file__), "..", "data", "nse_stocks_sectors.csv")
 
 # Public, current, comprehensive broker instrument dumps (no auth). These are the
 # most reliable way to get *every* listed stock from a cloud host when NSE's own
@@ -184,14 +185,40 @@ def load_universe(market: str = "NSE", prefer_live: bool = True) -> List[Dict[st
 
 
 def curated_universe() -> List[Dict[str, str]]:
-    """The bundled list of large, liquid, well-known names.
+    """Sector-tagged pool of large, liquid, well-known names for the Top Picks scan.
 
-    Used by the Top Picks scan as a fast, relevant candidate pool (scanning the
-    full live list would be slow and include illiquid micro-caps).
+    Each row is ``{"symbol", "name", "sector"}``. Reads the bundled sector dataset
+    (so scans can be filtered sector-wise); falls back to the plain bundled list
+    (sector "Other") if that file is missing. A fast, relevant candidate pool —
+    scanning the full live list would be slow and include illiquid micro-caps.
     """
-    rows = _load_bundled()
-    rows.sort(key=lambda r: r["name"].lower())
+    rows: List[Dict[str, str]] = []
+    seen = set()
+    try:
+        with open(os.path.normpath(_BUNDLED_SECTORS), newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                sym = (r.get("symbol") or "").strip().upper()
+                if sym and sym not in seen:
+                    seen.add(sym)
+                    rows.append({
+                        "symbol": sym,
+                        "name": (r.get("name") or sym).strip(),
+                        "sector": (r.get("sector") or "Other").strip(),
+                    })
+    except OSError:
+        rows = []
+
+    if not rows:  # fallback: bundled list without sectors
+        for r in _load_bundled():
+            rows.append({**r, "sector": "Other"})
+
+    rows.sort(key=lambda r: (r["sector"].lower(), r["name"].lower()))
     return rows
+
+
+def curated_sectors() -> List[str]:
+    """Sorted list of distinct sectors in the curated pool."""
+    return sorted({r["sector"] for r in curated_universe()})
 
 
 def search(query: str, market: str = "NSE", limit: int = 50) -> List[Dict[str, str]]:

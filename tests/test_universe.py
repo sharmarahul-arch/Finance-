@@ -23,6 +23,26 @@ def no_network(monkeypatch):
     universe.load_universe.cache_clear()
 
 
+def test_curated_universe_has_sectors():
+    rows = universe.curated_universe()
+    assert len(rows) > 200            # much larger than the old 154
+    assert all({"symbol", "name", "sector"} <= set(r) for r in rows)
+    syms = {r["symbol"] for r in rows}
+    assert {"RELIANCE", "INFY", "HDFCBANK", "SUNPHARMA"} <= syms
+
+
+def test_curated_sectors_cover_major_groups():
+    sectors = set(universe.curated_sectors())
+    for s in ("IT", "Banks", "Pharma", "FMCG", "Auto", "Energy"):
+        assert s in sectors
+
+
+def test_curated_universe_deduped():
+    rows = universe.curated_universe()
+    syms = [r["symbol"] for r in rows]
+    assert len(syms) == len(set(syms))   # no duplicate symbols
+
+
 def test_bundled_list_loads():
     rows = universe._load_bundled()
     assert len(rows) > 50
